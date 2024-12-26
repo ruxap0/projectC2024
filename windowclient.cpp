@@ -1,7 +1,7 @@
 #include "windowclient.h"
 #include "ui_windowclient.h"
 #include <QMessageBox>
-#include <string>
+#include <string.h> //enlever le .h s'il y a un pb
 using namespace std;
 
 #include "protocole.h"
@@ -12,11 +12,18 @@ using namespace std;
 #include <sys/msg.h>
 #include <sys/shm.h>
 #include <signal.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+void ajouteUtilisateur(const char* name, const char* motDePasse);
+int verifieMotDePasse(int pos, const char* motDePasse);
+int calculateHash(const char* motDePasse);
+int rechercherClient(const char* nom);
 
 extern WindowClient *w;
 
 int idQ, idShm;
-bool logged;
+bool logged = false;
 char* pShm;
 ARTICLE articleEnCours;
 float totalCaddie = 0.0;
@@ -45,21 +52,42 @@ WindowClient::WindowClient(QWidget *parent) : QMainWindow(parent), ui(new Ui::Wi
     ui->tableWidgetPanier->horizontalHeader()->setStyleSheet("background-color: lightyellow");
 
     // Recuperation de l'identifiant de la file de messages
-    //fprintf(stderr,"(CLIENT %d) Recuperation de l'id de la file de messages\n",getpid());
+    fprintf(stderr,"(CLIENT %d) Recuperation de l'id de la file de messages\n",getpid());
     // TO DO
+    if((idQ = msgget(CLE, 0)) == -1)
+      perror("Erreur de récupération de la file de message...\n");
 
     // Recuperation de l'identifiant de la mémoire partagée
-    //fprintf(stderr,"(CLIENT %d) Recuperation de l'id de la mémoire partagée\n",getpid());
+    fprintf(stderr,"%d Recuperation de l'id de la mémoire partagée\n",getpid());
     // TO DO
+    if((idShm = shmget(CLE, 0, 0)) != 0)
+      perror("Erreur de récupération de la mémoire partagée...\n");
 
     // Attachement à la mémoire partagée
     // TO DO
+    if((pShm = (char*)shmat(idShm, NULL, 0)) == (char*)-1)
+      perror("Erreur de shmat()...\n");
 
     // Armement des signaux
     // TO DO
+    struct sigaction s_action1;
+    s_action1.sa_handler = handlerSIGUSR1;
+    sigaction(SIGUSR1, &s_action1, nullptr);
+
+    struct sigaction s_action2;
+    s_action2.sa_handler = handlerSIGUSR2;
+    sigaction(SIGUSR2, &s_action2, nullptr);
 
     // Envoi d'une requete de connexion au serveur
     // TO DO
+    MESSAGE connectRequest;
+    connectRequest.expediteur = getpid();
+    connectRequest.type = 1;
+    connectRequest.requete = CONNECT;
+    if(msgsnd(idQ, &connectRequest, sizeof(MESSAGE) - sizeof(long), 0))
+      perror("Erreur de l'envoi de la demande de connection...\n");
+    else
+      perror("Requete de demande de connexion envoyée !\n");
 
     // Exemples à supprimer
     setPublicite("Promotions sur les concombres !!!");
@@ -300,10 +328,18 @@ void WindowClient::closeEvent(QCloseEvent *event)
 {
   // TO DO (étape 1)
   // Envoi d'une requete DECONNECT au serveur
-
+  MESSAGE deconnect;
+  
   // envoi d'un logout si logged
 
+
   // Envoi d'une requete de deconnexion au serveur
+  deconnect.type = 1;
+  deconnect.expediteur = getpid();
+  deconnect.requete = DECONNECT;
+
+  if(msgsnd(idQ, &deconnect, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+    perror("Erreur d'envoi de message de deconnexion...\n");
 
   exit(0);
 }
@@ -313,8 +349,36 @@ void WindowClient::closeEvent(QCloseEvent *event)
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void WindowClient::on_pushButtonLogin_clicked()
 {
-    // Envoi d'une requete de login au serveur
-    // TO DO
+  int pos;
+  MESSAGE loginReq, answer;
+
+  if(strlen(getMotDePasse()) < 4 || strlen(getNom()) < 4)
+    perror("Nom ou Mot de passe trop court... (min 3 caractères)\n");
+  else
+  {
+    loginReq.expediteur = getpid();
+    loginReq.type = 1;
+    loginReq.type = LOGIN;
+    if(isNouveauClientChecked())
+      loginReq.data1 = 1;
+    else
+      loginReq.data1 = 0;
+    strcpy(loginReq.data2, getNom());
+    strcpy(loginReq.data3, getMotDePasse());
+
+    if(msgsnd(idQ, &loginReq, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+      perror("Erreur d'envoi de la requête de login...\n");
+    else
+    {
+      if(msgrcv(idQ, &answer, sizeof(MESSAGE) - sizeof(long), getpid(), 0) == -1)
+        perror("Erreur de reception de la reponse...\n");
+      else
+      {
+        if(answer.data1 = 1)
+          loginOK();
+      }
+    }
+  }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -427,6 +491,11 @@ void handlerSIGUSR1(int sig)
                     break;
       }
     }
+}
+
+void handlerSIGUSR2(int sig)
+{
+  
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -33,6 +33,10 @@
 #define NEW_PUB      14  // Ge -> S                                                publicite
 //                          S  -> P                                                publicite
 
+#define SIZESHM    1000
+
+#define FICHIER_UTILISATEURS "utilisateurs.dat"
+
 typedef struct
 {
   long  type;
@@ -68,4 +72,3 @@ typedef struct
   int   pidAccesBD;
   CONNEXION connexions[6];
 } TAB_CONNEXIONS;
-

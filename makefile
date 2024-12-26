@@ -2,7 +2,7 @@
 
 .SILENT:
 
-OBJECTS = maingerant.o windowgerant.o moc_windowgerant.o mainclient.o windowclient.o moc_windowclient.o
+OBJECTS = maingerant.o windowgerant.o moc_windowgerant.o mainclient.o windowclient.o moc_windowclient.o FichierUtilisateur.o
 PROGRAMS = Gerant Client Serveur CreationBD Publicite Caddie AccesBD
 
 all: $(PROGRAMS)
@@ -42,9 +42,14 @@ moc_windowclient.o : moc_windowclient.cpp ui_windowclient.h
 	g++ -Wno-unused-parameter -c -pipe -g -std=gnu++11 -Wall -W -D_REENTRANT -fPIC -DQT_DEPRECATED_WARNINGS -DQT_QML_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -I../UNIX_DOSSIER_FINAL -I. -isystem /usr/include/qt5 -isystem /usr/include/qt5/QtWidgets -isystem /usr/include/qt5/QtGui -isystem /usr/include/qt5/QtCore -I. -I. -I/usr/lib64/qt5/mkspecs/linux-g++ -o moc_windowclient.o moc_windowclient.cpp
 
 #Serveur
-Serveur : Serveur.cpp
+Serveur : Serveur.cpp FichierUtilisateur.o
 	echo Creation de Serveur
-	g++ Serveur.cpp -o Serveur -I/usr/include/mysql -m64 -L/usr/lib64/mysql -lmysqlclient -lpthread -lz -lm -lrt -lssl -lcrypto -ldl
+	g++ Serveur.cpp FichierUtilisateur.o -o Serveur -I/usr/include/mysql -m64 -L/usr/lib64/mysql -lmysqlclient -lpthread -lz -lm -lrt -lssl -lcrypto -ldl
+
+#FichierUtilisateur
+FichierUtilisateur.o : FichierUtilisateur.cpp FichierUtilisateur.h
+	echo Compilation de FichierUtilisateur.o
+	g++ -Wno-unused-parameter -c -pipe -g -std=gnu++11 -Wall -W -D_REENTRANT -fPIC -DQT_DEPRECATED_WARNINGS -DQT_QML_DEBUG -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_CORE_LIB -I../UNIX_DOSSIER_FINAL -I. -isystem /usr/include/qt5 -isystem /usr/include/qt5/QtWidgets -isystem /usr/include/qt5/QtGui -isystem /usr/include/qt5/QtCore -I. -I. -I/usr/lib64/qt5/mkspecs/linux-g++ -o FichierUtilisateur.o FichierUtilisateur.cpp
 
 #CreationBD
 CreationBD : CreationBD.cpp

@@ -12,12 +12,14 @@
 #include <string.h>
 #include <unistd.h>
 #include "protocole.h" // contient la cle et la structure d'un message
+#include "FichierUtilisateur.h"
 
 int idQ,idShm,idSem;
 int fdPipe[2];
 TAB_CONNEXIONS *tab;
 
 void afficheTab();
+int checkLogin(MESSAGE *usr);
 
 int main()
 {
@@ -34,6 +36,11 @@ int main()
   }
 
   // TO BE CONTINUED
+  if((idShm = shmget(CLE, SIZESHM, IPC_CREAT | IPC_EXCL | 0600)) == -1)
+  {
+    perror("(SERVEUR) Erreur de shmget()...\n");
+    exit(1);
+  }
 
   // Creation du pipe
   // TO DO
@@ -82,7 +89,12 @@ int main()
                       break;
       case LOGIN :    // TO DO
                       fprintf(stderr,"(SERVEUR %d) Requete LOGIN reçue de %d : --%d--%s--%s--\n",getpid(),m.expediteur,m.data1,m.data2,m.data3);
-                      break; 
+                      
+                      reponse.data1 = checkLogin(&m);
+                      strcpy(reponse.data4, m.data4);
+                      if(msgsnd(idQ, &reponse, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                        perror("(SERVEUR) Erreur d'envoi de la reponse...\n");
+
 
       case LOGOUT :   // TO DO
                       fprintf(stderr,"(SERVEUR %d) Requete LOGOUT reçue de %d\n",getpid(),m.expediteur);
@@ -135,3 +147,76 @@ void afficheTab()
   fprintf(stderr,"\n");
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+//    Fonctions du Switch             ////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// CONNECT
+
+// DECONNECT
+
+//LOGIN
+int checkLogin(MESSAGE *usr)
+{
+  int pos;
+
+  pos = estPresent(usr->data2);
+
+  if(usr->data1 == 1) // Is Nouveau checked
+  {
+    if(pos <= 0)
+    {
+      strcpy(usr->data4, "Client deja existant");
+      perror("Client deja existant\n");
+      return 0;
+    }
+    else
+    {
+      ajouteUtilisateur(usr->data2, usr->data3);
+      return 1;
+    }
+  }
+  else
+  {
+    if(pos == -1)
+    {
+      strcpy(usr->data4, "Client Inexistant");
+      perror("Client Inexistant...\n");
+      return 0;
+    }
+    else  // IsNouveau not checked & il existe dans le fichier
+    {
+      if(verifieMotDePasse(pos, usr->data3))
+      {
+        strcpy(usr->data4, "Bon mpd!");
+        perror("Bon mdp !\n");
+        return 1;
+      }
+      else
+      {
+        strcpy(usr->data4, "Mdp errone...");
+        perror("Mdp errone...\n");
+        return 0;
+      }
+    }
+  }
+
+}
+
+//LOGOUT
+
+// UPDATEPUB
+
+// CONSULT
+
+// ACHAT
+
+// CADDIE
+
+// CANCEL
+
+// CANCEL_ALL
+
+// PAYER
+
+// NEW_PUB
