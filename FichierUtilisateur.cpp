@@ -9,26 +9,38 @@
 
 int estPresent(const char* nom)
 {
+  printf("--- Entrée dans estPresent() ---\n");
+
   UTILISATEUR readUser;
-  int position = 0, descrFile, foundIt = 0;
+  int position = 0, descrFile, found = 0;
   
-  if((descrFile = open(FICHIER_UTILISATEURS, O_RDONLY)) == -1){
+  if((descrFile = open(FICHIER_CLIENTS, O_RDONLY)) == -1){
     perror("Erreur de open()");
     return (-1);
   }
 
-  while(read(descrFile, &readUser, sizeof(UTILISATEUR)) != -1 && foundIt != 1){
-    position += 1;
-    if(nom == readUser.nom)
-      foundIt = 1;
+  while(read(descrFile, &readUser, sizeof(UTILISATEUR)) > 0)
+  {
+
+    if(strcmp(nom,readUser.nom) == 0)
+    {
+      found = 1;
+      break;
+    }
+
+    position++;
   }
 
   if(close(descrFile)){
     perror("Erreur de close()");
     exit(1);
   }
-  if(foundIt == 0)
+
+  if(found == 0)
+  {
+    printf("Sup nigger\n");
     return -1;
+  }
   else
     return position;
 }
@@ -36,8 +48,10 @@ int estPresent(const char* nom)
 ////////////////////////////////////////////////////////////////////////////////////
 int hash(const char* motDePasse)
 {
+  printf("--- Entrée dans hash() ---\n");
+
   int retourHash = 0;
-  for(int i = 0; i < strlen(motDePasse); i++)
+  for(size_t i = 0; i < strlen(motDePasse); i++)
     retourHash += (i + 1) * (int)motDePasse[i];
 
   return retourHash % 97;
@@ -46,13 +60,15 @@ int hash(const char* motDePasse)
 ////////////////////////////////////////////////////////////////////////////////////
 void ajouteUtilisateur(const char* name, const char* motDePasse)
 {
+  printf("--- Entrée dans ajouteUtilisateur() ---\n");
+
   int descrFile;
   UTILISATEUR writeUser;
 
   strcpy(writeUser.nom, name);
   writeUser.hash = hash(motDePasse);
 
-  if((descrFile = open(FICHIER_UTILISATEURS, O_WRONLY | O_CREAT)) == -1){
+  if((descrFile = open(FICHIER_CLIENTS, O_WRONLY | O_CREAT)) == -1){
     perror("Erreur de open()");
     exit(1);
   }
@@ -70,10 +86,12 @@ void ajouteUtilisateur(const char* name, const char* motDePasse)
 ////////////////////////////////////////////////////////////////////////////////////
 int verifieMotDePasse(int pos, const char* motDePasse)
 {
+  printf("--- Entrée dans verifieMotDePasse() ---\n");
+
   int descrFile;
   UTILISATEUR checkUser;
 
-  if((descrFile = open(FICHIER_UTILISATEURS, O_RDONLY)) == -1){
+  if((descrFile = open(FICHIER_CLIENTS, O_RDONLY)) == -1){
     perror("Erreur de open()");
     return -1;
   }
@@ -90,24 +108,4 @@ int verifieMotDePasse(int pos, const char* motDePasse)
     return 1;
   else
     return 0;
-}
-
-////////////////////////////////////////////////////////////////////////////////////
-int listeUtilisateurs(UTILISATEUR *vecteur) // le vecteur doit etre suffisamment grand
-{
-  int descrFile, countuser = 0;
-
-  if ((descrFile = open(FICHIER_UTILISATEURS, O_RDONLY)) == -1){
-    perror("Erreur de open()");
-    return -1;
-  }
-
-  for(int i = 0; read(descrFile, &vecteur[i], sizeof(UTILISATEUR)) > 0; i++, countuser++){}
-  
-  if(close(descrFile)){
-    perror("Erreur de close()");
-    return -1;
-  }
-
-  return countuser;
 }

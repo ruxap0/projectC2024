@@ -1,3 +1,4 @@
+#include <csignal>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -17,6 +18,7 @@
 int idQ,idShm,idSem;
 int fdPipe[2];
 TAB_CONNEXIONS *tab;
+int dsc;
 
 void afficheTab();
 int checkLogin(MESSAGE *usr);
@@ -65,8 +67,11 @@ int main()
   // Creation du processus AccesBD (étape 4)
   // TO DO
 
+  tab->pidServeur = getpid();
+
   MESSAGE m;
   MESSAGE reponse;
+  int nbClient = 0;
 
   while(1)
   {
@@ -82,16 +87,51 @@ int main()
     {
       case CONNECT :  // TO DO
                       fprintf(stderr,"(SERVEUR %d) Requete CONNECT reçue de %d\n",getpid(),m.expediteur);
+
+                      if(nbClient >= 5)
+                        perror("Plus de place pour un autre client...\n");
+                      else
+                      {
+                        for(int i = 0; i < 6; i++)
+                        {
+                          if(tab->connexions[i].pidFenetre == 0)
+                          {
+                            tab->connexions[i].pidFenetre = m.expediteur;
+                            nbClient++;
+                            i = 6;
+                          }
+                        }
+                      }
+
                       break;
 
       case DECONNECT : // TO DO
                       fprintf(stderr,"(SERVEUR %d) Requete DECONNECT reçue de %d\n",getpid(),m.expediteur);
+
+                      for(int i = 0; i < 6; i++)
+                      {
+                        if(tab->connexions[i].pidFenetre == m.expediteur)
+                        {
+                          tab->connexions[i].pidFenetre = 0;
+                          strcpy(tab->connexions[i].nom, "");
+                          tab->connexions[i].pidCaddie = 0;
+
+                          kill(m.expediteur, SIGUSR2);
+                        }
+                      }
+
                       break;
+
       case LOGIN :    // TO DO
                       fprintf(stderr,"(SERVEUR %d) Requete LOGIN reçue de %d : --%d--%s--%s--\n",getpid(),m.expediteur,m.data1,m.data2,m.data3);
                       
                       reponse.data1 = checkLogin(&m);
+                      reponse.requete = LOGIN;
+                      reponse.type = m.expediteur;
                       strcpy(reponse.data4, m.data4);
+                      kill(m.expediteur, SIGUSR1);
+
+
                       if(msgsnd(idQ, &reponse, sizeof(MESSAGE) - sizeof(long), 0) == -1)
                         perror("(SERVEUR) Erreur d'envoi de la reponse...\n");
 
@@ -159,12 +199,13 @@ void afficheTab()
 int checkLogin(MESSAGE *usr)
 {
   int pos;
+  printf("--- Entrée dans checkLogin() ---\n");
 
   pos = estPresent(usr->data2);
 
   if(usr->data1 == 1) // Is Nouveau checked
   {
-    if(pos <= 0)
+    if(pos >= 0)
     {
       strcpy(usr->data4, "Client deja existant");
       perror("Client deja existant\n");
@@ -200,7 +241,6 @@ int checkLogin(MESSAGE *usr)
       }
     }
   }
-
 }
 
 //LOGOUT

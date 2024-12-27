@@ -1,7 +1,7 @@
 #ifndef FICHIER_UTILISATEUR_H
 #define FICHIER_UTILISATEUR_H
 
-#define FICHIER_UTILISATEURS "utilisateurs.dat"
+#define FICHIER_CLIENTS "clients.dat"
 
 // Pour le fichier des utilisateurs
 typedef struct
@@ -28,9 +28,5 @@ int verifieMotDePasse(int pos, const char* motDePasse);
 //          0 sinon
 //         -1 en cas d'erreur 
 
-int listeUtilisateurs(UTILISATEUR *vecteur);
-// reçoit l'adresse d'un vecteur d'utilisateurs suffisament grand pour recevoir le contenu du fichier
-// retourne le nombre d'utilisateurs présents dans le fichier
-//          -1 si le fichier n'existe pas
 
 #endif

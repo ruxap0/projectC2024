@@ -35,8 +35,6 @@
 
 #define SIZESHM    1000
 
-#define FICHIER_UTILISATEURS "utilisateurs.dat"
-
 typedef struct
 {
   long  type;

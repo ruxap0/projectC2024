@@ -349,8 +349,7 @@ void WindowClient::closeEvent(QCloseEvent *event)
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void WindowClient::on_pushButtonLogin_clicked()
 {
-  int pos;
-  MESSAGE loginReq, answer;
+  MESSAGE loginReq;
 
   if(strlen(getMotDePasse()) < 4 || strlen(getNom()) < 4)
     perror("Nom ou Mot de passe trop court... (min 3 caractères)\n");
@@ -358,7 +357,7 @@ void WindowClient::on_pushButtonLogin_clicked()
   {
     loginReq.expediteur = getpid();
     loginReq.type = 1;
-    loginReq.type = LOGIN;
+    loginReq.requete = LOGIN;
     if(isNouveauClientChecked())
       loginReq.data1 = 1;
     else
@@ -368,18 +367,10 @@ void WindowClient::on_pushButtonLogin_clicked()
 
     if(msgsnd(idQ, &loginReq, sizeof(MESSAGE) - sizeof(long), 0) == -1)
       perror("Erreur d'envoi de la requête de login...\n");
-    else
-    {
-      if(msgrcv(idQ, &answer, sizeof(MESSAGE) - sizeof(long), getpid(), 0) == -1)
-        perror("Erreur de reception de la reponse...\n");
-      else
-      {
-        if(answer.data1 = 1)
-          loginOK();
-      }
-    }
+
   }
 }
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void WindowClient::on_pushButtonLogout_clicked()
@@ -464,12 +455,19 @@ void WindowClient::on_pushButtonPayer_clicked()
 void handlerSIGUSR1(int sig)
 {
     MESSAGE m;
-  
+    printf("WAZZZZZZZZZZZZUP\n");
     if (msgrcv(idQ,&m,sizeof(MESSAGE)-sizeof(long),getpid(),0) != -1)  // !!! a modifier en temps voulu !!!
     {
+      
       switch(m.requete)
       {
         case LOGIN :
+                    if(m.data1 == 1)
+                    {
+                      w->loginOK();
+                      w->dialogueMessage("LOGIN", m.data4);
+                    }
+      
                     break;
 
         case CONSULT : // TO DO (étape 3)
@@ -495,7 +493,8 @@ void handlerSIGUSR1(int sig)
 
 void handlerSIGUSR2(int sig)
 {
-  
+  perror("Entré dans le handler de SIGUSR2...\n");
+  exit(1);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
