@@ -87,7 +87,7 @@ WindowClient::WindowClient(QWidget *parent) : QMainWindow(parent), ui(new Ui::Wi
     if(msgsnd(idQ, &connectRequest, sizeof(MESSAGE) - sizeof(long), 0))
       perror("Erreur de l'envoi de la demande de connection...\n");
     else
-      perror("Requete de demande de connexion envoyée !\n");
+      printf("Requete de demande de connexion envoyée !\n");
 
     // Exemples à supprimer
     setPublicite("Promotions sur les concombres !!!");
@@ -375,11 +375,29 @@ void WindowClient::on_pushButtonLogin_clicked()
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void WindowClient::on_pushButtonLogout_clicked()
 {
+  /*MESSAGE req;
     // Envoi d'une requete CANCEL_ALL au serveur (au cas où le panier n'est pas vide)
     // TO DO
+  req.expediteur = getpid();
+  req.type = 1;
+  req.requete = CANCEL_ALL;
 
-    // Envoi d'une requete de logout au serveur
-    // TO DO
+  if(msgsnd(idQ, &req, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+    perror("Erreur d'envoi de cancel_all...\n");
+  else*/
+
+  // Envoi d'une requete de logout au serveur
+  // TO DO
+  MESSAGE logoutReq;
+
+  logoutReq.expediteur = getpid();
+  logoutReq.type = 1;
+  logoutReq.requete = LOGOUT;
+
+  if(msgsnd(idQ, &logoutReq, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+    perror("Erreur de l'envoi de logout...\n");
+  else
+    logoutOK();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -467,6 +485,10 @@ void handlerSIGUSR1(int sig)
                       w->loginOK();
                       w->dialogueMessage("LOGIN", m.data4);
                     }
+                    else
+                    {
+                      w->dialogueMessage("LOGIN ERROR", m.data4);
+                    }
       
                     break;
 
@@ -493,7 +515,7 @@ void handlerSIGUSR1(int sig)
 
 void handlerSIGUSR2(int sig)
 {
-  perror("Entré dans le handler de SIGUSR2...\n");
+  printf("Entré dans le handler de SIGUSR2...\n");
   exit(1);
 }
 

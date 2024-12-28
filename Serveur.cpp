@@ -71,7 +71,7 @@ int main()
 
   MESSAGE m;
   MESSAGE reponse;
-  int nbClient = 0;
+  int nbClient = 0; // Seulement pour vérifier s'il n'y a pas too much clients en mm temps pour éviter la surcharge
 
   while(1)
   {
@@ -108,7 +108,7 @@ int main()
       case DECONNECT : // TO DO
                       fprintf(stderr,"(SERVEUR %d) Requete DECONNECT reçue de %d\n",getpid(),m.expediteur);
 
-                      for(int i = 0; i < 6; i++)
+                      for(int i = 0; i < 5; i++)
                       {
                         if(tab->connexions[i].pidFenetre == m.expediteur)
                         {
@@ -125,19 +125,41 @@ int main()
       case LOGIN :    // TO DO
                       fprintf(stderr,"(SERVEUR %d) Requete LOGIN reçue de %d : --%d--%s--%s--\n",getpid(),m.expediteur,m.data1,m.data2,m.data3);
                       
-                      reponse.data1 = checkLogin(&m);
+                      if((reponse.data1 = checkLogin(&m)) == 1)
+                      {
+                        for(int i = 0; i < 5; i++)
+                        {
+                          if(m.expediteur == tab->connexions[i].pidFenetre)
+                          {
+                            strcpy(tab->connexions[i].nom, m.data2);
+                            //pidCaddie à faire
+                          }
+                        }
+                      }
+
                       reponse.requete = LOGIN;
                       reponse.type = m.expediteur;
                       strcpy(reponse.data4, m.data4);
                       kill(m.expediteur, SIGUSR1);
 
-
                       if(msgsnd(idQ, &reponse, sizeof(MESSAGE) - sizeof(long), 0) == -1)
                         perror("(SERVEUR) Erreur d'envoi de la reponse...\n");
+
+                      break;
 
 
       case LOGOUT :   // TO DO
                       fprintf(stderr,"(SERVEUR %d) Requete LOGOUT reçue de %d\n",getpid(),m.expediteur);
+
+                      for(int i = 0; i < 6; i++) // 6 et pas nbClient car on ne sait pas (en théorie) savoir où se trouve le client à logout dans le vecteur
+                      {
+                        if(m.expediteur == tab->connexions[i].pidFenetre)
+                        {
+                          strcpy(tab->connexions[i].nom, "");
+                          tab->connexions[i].pidCaddie = 0;
+                        }
+                      }
+
                       break;
 
       case UPDATE_PUB :  // TO DO
