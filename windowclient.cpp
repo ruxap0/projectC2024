@@ -15,11 +15,6 @@ using namespace std;
 #include <sys/stat.h>
 #include <fcntl.h>
 
-void ajouteUtilisateur(const char* name, const char* motDePasse);
-int verifieMotDePasse(int pos, const char* motDePasse);
-int calculateHash(const char* motDePasse);
-int rechercherClient(const char* nom);
-
 extern WindowClient *w;
 
 int idQ, idShm;
@@ -90,7 +85,6 @@ WindowClient::WindowClient(QWidget *parent) : QMainWindow(parent), ui(new Ui::Wi
       printf("Requete de demande de connexion envoyée !\n");
 
     // Exemples à supprimer
-    setPublicite("Promotions sur les concombres !!!");
     setArticle("pommes",5.53,18,"pommes.jpg");
     ajouteArticleTablePanier("cerises",8.96,2);
 }
@@ -331,7 +325,8 @@ void WindowClient::closeEvent(QCloseEvent *event)
   MESSAGE deconnect;
   
   // envoi d'un logout si logged
-
+  if(logged)
+    w->on_pushButtonLogout_clicked();
 
   // Envoi d'une requete de deconnexion au serveur
   deconnect.type = 1;
@@ -515,8 +510,7 @@ void handlerSIGUSR1(int sig)
 
 void handlerSIGUSR2(int sig)
 {
-  printf("Entré dans le handler de SIGUSR2...\n");
-  exit(1);
+  w->setPublicite(pShm);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////

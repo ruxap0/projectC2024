@@ -33,7 +33,7 @@
 #define NEW_PUB      14  // Ge -> S                                                publicite
 //                          S  -> P                                                publicite
 
-#define SIZESHM    1000
+#define SIZESHM      52  // Pour les caractères de la publicité
 
 typedef struct
 {
