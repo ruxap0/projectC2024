@@ -18,7 +18,7 @@ using namespace std;
 extern WindowClient *w;
 
 int idQ, idShm;
-bool logged = false;
+bool logged = false, updProblems = true;
 char* pShm;
 ARTICLE articleEnCours;
 float totalCaddie = 0.0;
@@ -53,15 +53,17 @@ WindowClient::WindowClient(QWidget *parent) : QMainWindow(parent), ui(new Ui::Wi
       perror("Erreur de récupération de la file de message...\n");
 
     // Recuperation de l'identifiant de la mémoire partagée
-    fprintf(stderr,"%d Recuperation de l'id de la mémoire partagée\n",getpid());
+    fprintf(stderr,"(CLIENT %d) Recuperation de l'id de la mémoire partagée\n",getpid());
     // TO DO
-    if((idShm = shmget(CLE, 0, 0)) != 0)
-      perror("Erreur de récupération de la mémoire partagée...\n");
+    if((idShm = shmget(CLE, 0, 0)) == -1)
+      perror("Erreur de récupération de la mémoire partagée...");
 
     // Attachement à la mémoire partagée
     // TO DO
     if((pShm = (char*)shmat(idShm, NULL, 0)) == (char*)-1)
       perror("Erreur de shmat()...\n");
+
+    updProblems = false;
 
     // Armement des signaux
     // TO DO
@@ -334,7 +336,7 @@ void WindowClient::closeEvent(QCloseEvent *event)
   deconnect.requete = DECONNECT;
 
   if(msgsnd(idQ, &deconnect, sizeof(MESSAGE) - sizeof(long), 0) == -1)
-    perror("Erreur d'envoi de message de deconnexion...\n");
+    perror("Erreur d'envoi de message de deconnexion...");
 
   exit(0);
 }
@@ -347,7 +349,7 @@ void WindowClient::on_pushButtonLogin_clicked()
   MESSAGE loginReq;
 
   if(strlen(getMotDePasse()) < 4 || strlen(getNom()) < 4)
-    perror("Nom ou Mot de passe trop court... (min 3 caractères)\n");
+    printf("Nom ou Mot de passe trop court... (min 3 caractères)\n");
   else
   {
     loginReq.expediteur = getpid();
@@ -361,7 +363,7 @@ void WindowClient::on_pushButtonLogin_clicked()
     strcpy(loginReq.data3, getMotDePasse());
 
     if(msgsnd(idQ, &loginReq, sizeof(MESSAGE) - sizeof(long), 0) == -1)
-      perror("Erreur d'envoi de la requête de login...\n");
+      perror("Erreur d'envoi de la requête de login...");
 
   }
 }
@@ -390,7 +392,7 @@ void WindowClient::on_pushButtonLogout_clicked()
   logoutReq.requete = LOGOUT;
 
   if(msgsnd(idQ, &logoutReq, sizeof(MESSAGE) - sizeof(long), 0) == -1)
-    perror("Erreur de l'envoi de logout...\n");
+    perror("Erreur de l'envoi de logout...");
   else
     logoutOK();
 }
@@ -510,7 +512,11 @@ void handlerSIGUSR1(int sig)
 
 void handlerSIGUSR2(int sig)
 {
-  w->setPublicite(pShm);
+  if(!updProblems)
+  {
+    printf("(CLIENT %d) Handler de SIGUSR2...\n", getpid());
+    w->setPublicite(pShm);
+  }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////

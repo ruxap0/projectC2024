@@ -77,6 +77,4 @@ clean:
 	rm -f $(OBJECTS) $(PROGRAMS)
 
 run: all
-	ipcrm -M 0x4d2
-	ipcrm -Q 0x4d2
 	./Serveur

@@ -16,7 +16,7 @@
 int idQ, idShm;
 char *pShm;
 void handlerSIGUSR1(int sig);
-void handlerSIGINTpub(int sig);
+void handlerSIGINT(int sig);
 int fd;
 
 int main()
@@ -24,31 +24,31 @@ int main()
   // Armement des signaux
   // TO DO
   struct sigaction s_action1;
-  s_action1.sa_handler = handlerSIGINTpub;
+  s_action1.sa_handler = handlerSIGINT;
   sigaction(SIGINT, &s_action1, nullptr);
 
   // Masquage des signaux
   sigset_t mask;
   sigfillset(&mask);
   sigdelset(&mask,SIGUSR1);
+  sigdelset(&mask, SIGINT);
   sigprocmask(SIG_SETMASK,&mask,NULL);
 
   // Recuperation de l'identifiant de la file de messages
   fprintf(stderr,"(PUBLICITE %d) Recuperation de l'id de la file de messages\n",getpid());
   if ((idQ = msgget(CLE,0)) == -1)
   {
-    perror("(PUBLICITE) Erreur de msgget\n");
+    perror("(PUBLICITE) Erreur de msgget");
     exit(1);
   }
-  printf("%d", idQ);
 
   // Recuperation de l'identifiant de la mémoire partagée
   if((idShm = shmget(CLE, 0, 0)) == -1)
-    perror("(PUBLICITE) Erreur de recup de la mem partagee\n");
+    perror("(PUBLICITE) Erreur de recup de la mem partagee");
 
   // Attachement à la mémoire partagée
   if((pShm = (char*)shmat(idShm, NULL, 0)) == (char*)-1)
-    perror("(PUBLICITE) Erreur de shmat...\n");
+    perror("(PUBLICITE) Erreur de shmat...");
 
   // Mise en place de la publicité en mémoire partagée
   char pub[51];
@@ -66,12 +66,10 @@ int main()
     rup.requete = UPDATE_PUB;
     rup.expediteur = getpid();
 
-    printf("idQ %d", idQ);
-
-    if(msgsnd(idQ, &rup, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+    if(msgsnd(idQ, &rup, sizeof(MESSAGE) - sizeof(long), IPC_NOWAIT) == -1)
       perror("(PUBLICITE) Erreur de snd de update...");
 
-    sleep(1); 
+    sleep(1);
     
     // Decallage vers la gauche
 
@@ -94,7 +92,7 @@ void handlerSIGUSR1(int sig)
   // Mise en place de la publicité en mémoire partagée
 }
 
-void handlerSIGINTpub(int sig)
+void handlerSIGINT(int sig)
 {
   fprintf(stderr,"(PUBLICITE) HANDLER DE SIGINT\n");
   exit(0);

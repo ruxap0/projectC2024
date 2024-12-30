@@ -45,7 +45,7 @@ int main()
   // TO BE CONTINUED
   if((idShm = shmget(CLE, SIZESHM, IPC_CREAT | IPC_EXCL | 0600)) == -1)
   {
-    perror("(SERVEUR) Erreur de shmget()...\n");
+    perror("(SERVEUR) Erreur de shmget()...");
     exit(1);
   }
 
@@ -71,7 +71,7 @@ int main()
   if((pidPub = fork()) == 0)
   {
     if(execlp("./Publicite", "Publicite", NULL) == -1)
-      perror("Erreur d'excecution de Publicite...\n");
+      perror("Erreur d'excecution de Publicite...");
     else
       printf("Publicite lance avec succes!!!\n");
   }
@@ -103,7 +103,7 @@ int main()
                         fprintf(stderr,"(SERVEUR %d) Requete CONNECT reçue de %d\n",getpid(),m.expediteur);
 
                         if(nbClient >= 5)
-                          perror("Plus de place pour un autre client...\n");
+                          perror("Plus de place pour un autre client...");
                         else
                         {
                           for(int i = 0; i < 6; i++)
@@ -157,7 +157,7 @@ int main()
                         kill(m.expediteur, SIGUSR1);
 
                         if(msgsnd(idQ, &reponse, sizeof(MESSAGE) - sizeof(long), 0) == -1)
-                          perror("(SERVEUR) Erreur d'envoi de la reponse...\n");
+                          perror("(SERVEUR) Erreur d'envoi de la reponse...");
 
                         break;
 
@@ -249,7 +249,7 @@ int checkLogin(MESSAGE *usr)
     if(pos >= 0)
     {
       strcpy(usr->data4, "Client deja existant");
-      perror("Client deja existant\n");
+      perror("Client deja existant");
       return 0;
     }
     else
@@ -263,7 +263,7 @@ int checkLogin(MESSAGE *usr)
     if(pos == -1)
     {
       strcpy(usr->data4, "Client Inexistant");
-      perror("Client Inexistant...\n");
+      perror("Client Inexistant...");
       return 0;
     }
     else  // IsNouveau not checked & il existe dans le fichier
@@ -271,13 +271,13 @@ int checkLogin(MESSAGE *usr)
       if(verifieMotDePasse(pos, usr->data3))
       {
         strcpy(usr->data4, "Bon mpd!");
-        perror("Bon mdp !\n");
+        perror("Bon mdp !");
         return 1;
       }
       else
       {
         strcpy(usr->data4, "Mdp errone...");
-        perror("Mdp errone...\n");
+        perror("Mdp errone...");
         return 0;
       }
     }
@@ -292,5 +292,12 @@ int checkLogin(MESSAGE *usr)
 void handlerSIGINT(int sig)
 {
   printf("(SERVEUR) HANDLER DE SIGINT...\n");
+
+  if(kill(pidPub, SIGINT) == -1)
+    perror("Erreur de kill");
+
+  msgctl(idQ, IPC_RMID, NULL);
+  shmctl(idShm, IPC_RMID, NULL);
+
   exit(0);
 }
