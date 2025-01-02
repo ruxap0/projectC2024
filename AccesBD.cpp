@@ -15,6 +15,7 @@
 #include "protocole.h" // contient la cle et la structure d'un message
 
 int idQ;
+MYSQL* connexion;
 
 int main(int argc,char* argv[])
 {
@@ -36,23 +37,70 @@ int main(int argc,char* argv[])
 
   // Connexion à la base de donnée
   // TO DO
+  connexion = mysql_init(NULL);
+  if (mysql_real_connect(connexion,"localhost","Student","PassStudent1_","PourStudent",0,0,0) == NULL)
+  {
+    fprintf(stderr,"(SERVEUR) Erreur de connexion à la base de données...\n");
+    exit(1);  
+  }
+
+  MYSQL_RES  *resultat;
+  MYSQL_ROW  Tuple;
 
   MESSAGE m;
+  MESSAGE reponse;
+
+  char requete[200];
 
   while(1)
   {
     // Lecture d'une requete sur le pipe
     // TO DO
+    if(read(fdRpipe, &m, sizeof(MESSAGE) - sizeof(long)) < 0)
+    {
+      perror("(ACCESBD) Erreur de read");
+      exit(1);
+    }
+ 
 
     switch(m.requete)
     {
       case CONSULT :  // TO DO
                       fprintf(stderr,"(ACCESBD %d) Requete CONSULT reçue de %d\n",getpid(),m.expediteur);
                       // Acces BD
+                      sprintf(requete, "select * from UNIX_FINAL where id = %d;", m.data1);
+                      if(mysql_query(connexion, requete) != 0)
+                      {
+                        fprintf(stderr, "Erreur de mysql_query %s\n", mysql_error(connexion));
+                      }
+                      else
+                      {
+                        reponse.requete = CONSULT;
+                        reponse.type = m.expediteur;
+                        reponse.expediteur = getpid();
+                        
+                        if((resultat = mysql_store_result(connexion)) == NULL)
+                        {
+                          fprintf(stderr, "Erreur de mysql_store_result %s\n", mysql_error(connexion));
+                          reponse.data1 = -1;
+                        }
+                        else
+                        {
+                          // Preparation de la reponse
+                          Tuple = mysql_fetch_row(resultat);
 
-                      // Preparation de la reponse
+                          reponse.data1 = atoi(Tuple[0]);
+                          strcpy(reponse.data2, Tuple[1]);
+                          strcpy(reponse.data3, Tuple[3]);
+                          strcpy(reponse.data4, Tuple[4]);
+                          reponse.data5 = atof(Tuple[2]);
+                        }
+                        // Envoi de la reponse au bon caddie
+                        
+                        if(msgsnd(idQ, &reponse, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                          perror("Erreur de snd Caddie");
+                      }
 
-                      // Envoi de la reponse au bon caddie
                       break;
 
       case ACHAT :    // TO DO

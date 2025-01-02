@@ -512,7 +512,7 @@ void handlerSIGUSR1(int sig)
                       reqCons.data1 = 1; // Pour accéder par défaut au 1er article de la DB
 
                       if(msgsnd(idQ, &reqCons, sizeof(MESSAGE) - sizeof(long), 0) == -1)
-                        perror("Erreur de snd");
+                        perror("Erreur de snd LOGIN");
 
                     }
                     else

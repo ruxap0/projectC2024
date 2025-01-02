@@ -25,8 +25,6 @@ int nbArticles = 0;
 int fdWpipe;
 int pidClient;
 
-MYSQL* connexion;
-
 void handlerSIGALRM(int sig);
 
 int main(int argc,char* argv[])
@@ -47,31 +45,17 @@ int main(int argc,char* argv[])
     exit(1);
   }
 
-
-  // Connexion à la base de donnée
-  connexion = mysql_init(NULL);
-  if (mysql_real_connect(connexion,"localhost","Student","PassStudent1_","PourStudent",0,0,0) == NULL)
-  {
-    fprintf(stderr,"(SERVEUR) Erreur de connexion à la base de données...\n");
-    exit(1);  
-  }
-
-
   MESSAGE m;
   MESSAGE reponse;
   
-  char requete[200];
   char newUser[20];
-  MYSQL_RES  *resultat;
-  MYSQL_ROW  Tuple;
 
   // Récupération descripteur écriture du pipe
-  //fdWpipe = atoi(argv[1]);
+  fdWpipe = atoi(argv[1]);
 
   while(1)
   {
-    printf("SUCCEESSSSSSSSSSS\n");
-    if (msgrcv(idQ,&m,sizeof(MESSAGE)-sizeof(long),getpid(),0) == -1)
+    if (msgrcv(idQ,&m,sizeof(MESSAGE) - sizeof(long),getpid(),0) == -1)
     {
       char* tm = strerror(errno);
       printf("JOLI PETIT MESSAGE : %s\n", tm);
@@ -84,55 +68,42 @@ int main(int argc,char* argv[])
     {
       case LOGIN :    // TO DO
                       fprintf(stderr,"(CADDIE %d) Requete LOGIN reçue de %d\n",getpid(),m.expediteur);
+                      pidClient = m.expediteur;
                       break;
 
       case LOGOUT :   // TO DO
                       fprintf(stderr,"(CADDIE %d) Requete LOGOUT reçue de %d\n",getpid(),m.expediteur);
-                      
-                      mysql_close(connexion); // ou mysql_shutdown ?
                       exit(0);                     
                       break;
 
       case CONSULT :  // TO DO
                       fprintf(stderr,"(CADDIE %d) Requete CONSULT reçue de %d\n",getpid(),m.expediteur);
                       
-                      sprintf(requete, "select * from UNIX_FINAL where id = %d;", m.data1);
-                      if(mysql_query(connexion, requete) != 0)
-                      {
-                        fprintf(stderr, "Erreur de mysql_query %s\n", mysql_error(connexion));
-                      }
+                      m.expediteur = getpid();
+
+                      if(write(fdWpipe, &m, sizeof(MESSAGE) - sizeof(long)) != (sizeof(MESSAGE) - sizeof(long)))
+                        perror("(CADDIE) Erreur de Write");
                       else
                       {
-                        if((resultat = mysql_store_result(connexion)) == NULL)
-                          fprintf(stderr, "Erreur de mysql_store_result %s\n", mysql_error(connexion));
-                        else
+                        MESSAGE conf;
+                        printf("BLYAAAAAAAAAAAAAAAAAAAAAAAAAAT\n");
+                        if(msgrcv(idQ, &conf, sizeof(MESSAGE) - sizeof(long), getpid(), 0) == -1)
+                          perror("(CADDIE) Erreur de rcv CONF");
+                        else if(conf.data1 != -1)
                         {
-                          Tuple = mysql_fetch_row(resultat);
-                          reponse.requete = CONSULT;
-                          reponse.type = m.expediteur;
-
-                          reponse.data1 = atoi(Tuple[0]);
-                          strcpy(reponse.data2, Tuple[1]);
-                          strcpy(reponse.data3, Tuple[3]);
-                          strcpy(reponse.data4, Tuple[4]);
-                          reponse.data5 = atof(Tuple[2]);
-
-                          if(msgsnd(idQ, &reponse, sizeof(MESSAGE) - sizeof(long), 0) == -1)
-                            perror("Erreur de snd Caddie");
-                          else
-                            kill(m.expediteur, SIGUSR1);
-
-                          
-                          /*for(size_t i = 0; i < strlen(reponse.data3); i++)
+                          MESSAGE repCons;
+                          repCons.data1 = conf.data1;
+                          strcpy(repCons.data2, conf.data2);
+                          strcpy(repCons.data3, conf.data3);
+                          strcpy(repCons.data4, conf.data4);
+                          repCons.data5 = conf.data5;
+                          if(msgsnd(idQ, &repCons, sizeof(MESSAGE) - sizeof(long), 0) == -1)
                           {
-                            if(reponse.data3[i] == '.')
-                            {
-                              reponse.data3[i] = ',';
-                              break;
-                            }
-                          }*/
+                            perror("(CADDIE) Erreur de snd CONF");
+                          }
                         }
                       }
+
                       break;
 
       case ACHAT :    // TO DO

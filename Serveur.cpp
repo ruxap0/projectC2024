@@ -15,7 +15,7 @@
 #include "protocole.h" // contient la cle et la structure d'un message
 #include "FichierUtilisateur.h"
 
-int pidPub, idCad;
+int pidPub, idCad, pidAcces;
 int idQ,idShm,idSem;
 int fdPipe[2];
 TAB_CONNEXIONS *tab;
@@ -58,6 +58,11 @@ int main()
 
   // Creation du pipe
   // TO DO
+  if(pipe(fdPipe) == -1)
+  {
+    perror("Erreur de pipe()");
+    exit(0);
+  }
 
   // Initialisation du tableau de connexions
   tab = (TAB_CONNEXIONS*) malloc(sizeof(TAB_CONNEXIONS)); 
@@ -86,6 +91,18 @@ int main()
   {
     // Creation du processus AccesBD (étape 4)
     // TO DO
+    char argv[256];
+    sprintf(argv, "%d", fdPipe[0]);
+    if((pidAcces = fork()) == 0)
+    {
+      if(execlp("./AccesBD", "AccesBD", argv, NULL) == -1)
+      {
+        perror("Erreur d'execlp AccesBD");
+        exit(1);
+      }
+      else
+        printf("AccesBD lancé avec succes\n");
+    }
 
     tab->pidServeur = getpid();
     tab->pidPublicite = pidPub;
@@ -101,7 +118,7 @@ int main()
       {
         perror("(SERVEUR) Erreur de msgrcv");
         msgctl(idQ,IPC_RMID,NULL);
-        exit(1);
+        exit(0);
       }
 
       switch(m.requete)
@@ -156,7 +173,9 @@ int main()
                               
                               if((idCad = fork()) == 0)
                               {
-                                if(execlp("./Caddie", "Caddie", NULL) == -1)
+                                char argv[256]; 
+                                sprintf(argv, "%d", fdPipe[1]);
+                                if(execlp("./Caddie", "Caddie", argv ,NULL) == -1)
                                   perror("(SERVEUR) Erreur d'exec de Caddie...");
                                 else
                                   printf("Caddie lance avec succes!\n");
@@ -243,7 +262,6 @@ int main()
       afficheTab();
     }
   }
-  
 }
 
 
@@ -350,6 +368,9 @@ void handlerSIGINT(int sig)
 
   msgctl(idQ, IPC_RMID, NULL);
   shmctl(idShm, IPC_RMID, NULL);
+  
+  close(fdPipe[0]);
+  close(fdPipe[1]);
 
   exit(0);
 }
