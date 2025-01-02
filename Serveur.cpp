@@ -15,7 +15,7 @@
 #include "protocole.h" // contient la cle et la structure d'un message
 #include "FichierUtilisateur.h"
 
-int pidPub;
+int pidPub, idCad;
 int idQ,idShm,idSem;
 int fdPipe[2];
 TAB_CONNEXIONS *tab;
@@ -24,6 +24,9 @@ int dsc;
 void afficheTab();
 int checkLogin(MESSAGE *usr);
 void handlerSIGINT(int sig);
+void handlerSIGCHLD(int sig);
+void envoiMessageCaddie(int pidCaddie);
+int findIndex(int pd);
 
 int main()
 {
@@ -32,6 +35,10 @@ int main()
   struct sigaction s_action1;
   s_action1.sa_handler = handlerSIGINT;
   sigaction(SIGINT, &s_action1, nullptr);
+
+  struct sigaction s_action2;
+  s_action2.sa_handler = handlerSIGCHLD;
+  sigaction(SIGCHLD, &s_action2, nullptr);
 
   // Creation des ressources
   // Creation de la file de message
@@ -122,7 +129,7 @@ int main()
         case DECONNECT : // TO DO
                         fprintf(stderr,"(SERVEUR %d) Requete DECONNECT reçue de %d\n",getpid(),m.expediteur);
 
-                        for(int i = 0; i < 5; i++)
+                        for(int i = 0; i < 6; i++)
                         {
                           if(tab->connexions[i].pidFenetre == m.expediteur)
                           {
@@ -141,12 +148,21 @@ int main()
                         
                         if((reponse.data1 = checkLogin(&m)) == 1)
                         {
-                          for(int i = 0; i < 5; i++)
+                          for(int i = 0; i < 6; i++)
                           {
                             if(m.expediteur == tab->connexions[i].pidFenetre)
                             {
                               strcpy(tab->connexions[i].nom, m.data2);
-                              //pidCaddie à faire
+                              
+                              if((idCad = fork()) == 0)
+                              {
+                                if(execlp("./Caddie", "Caddie", NULL) == -1)
+                                  perror("(SERVEUR) Erreur d'exec de Caddie...");
+                                else
+                                  printf("Caddie lance avec succes!\n");
+                              }
+
+                              tab->connexions[i].pidCaddie = idCad;
                             }
                           }
                         }
@@ -165,10 +181,11 @@ int main()
         case LOGOUT :   // TO DO
                         fprintf(stderr,"(SERVEUR %d) Requete LOGOUT reçue de %d\n",getpid(),m.expediteur);
 
-                        for(int i = 0; i < 5; i++) // 6 et pas nbClient car on ne sait pas (en théorie) savoir où se trouve le client à logout dans le vecteur
+                        for(int i = 0; i < 6; i++) // 6 et pas nbClient car on ne sait pas (en théorie) savoir où se trouve le client à logout dans le vecteur
                         {
                           if(m.expediteur == tab->connexions[i].pidFenetre)
                           {
+                            envoiMessageCaddie(tab->connexions[i].pidCaddie);
                             strcpy(tab->connexions[i].nom, "");
                             tab->connexions[i].pidCaddie = 0;
                           }
@@ -177,7 +194,7 @@ int main()
                         break;
 
         case UPDATE_PUB :  // TO DO
-                        for(int i = 0; i < 5; i++)
+                        for(int i = 0; i < 6; i++)
                         {
                           if((tab->connexions[i].pidFenetre) > 0)
                             kill(tab->connexions[i].pidFenetre, SIGUSR2);
@@ -187,6 +204,16 @@ int main()
 
         case CONSULT :  // TO DO
                         fprintf(stderr,"(SERVEUR %d) Requete CONSULT reçue de %d\n",getpid(),m.expediteur);
+
+                        MESSAGE reqCons;
+                        reqCons.data1 = m.data1;
+                        reqCons.requete = CONSULT;
+                        reqCons.type = tab->connexions[findIndex(m.expediteur)].pidCaddie;
+                        reqCons.expediteur = m.expediteur;
+
+                        if(msgsnd(idQ, &reqCons, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                          perror("(SERVEUR) Erreur de snd CONSULT");
+                          
                         break;
 
         case ACHAT :    // TO DO
@@ -284,6 +311,31 @@ int checkLogin(MESSAGE *usr)
   }
 }
 
+void envoiMessageCaddie(int pidCaddie)
+{
+  MESSAGE lgout;
+
+  lgout.type = pidCaddie;
+  lgout.requete = LOGOUT;
+  lgout.expediteur = getpid();
+
+  if(msgsnd(idQ, &lgout, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+    perror("envoiMessageCaddie() - Erreur de snd");
+}
+
+int findIndex(int pd)
+{
+  for(int i = 0; i < 6; i++)
+  {
+    if(tab->connexions[i].pidFenetre == pd)
+    {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 //    Handlers de Signaux                      ///////////////////////////////////////////////////////
@@ -300,4 +352,20 @@ void handlerSIGINT(int sig)
   shmctl(idShm, IPC_RMID, NULL);
 
   exit(0);
+}
+
+void handlerSIGCHLD(int sig)
+{
+  printf("(SERVEUR) HANDLER DE SIGCHLD...\n");
+  
+  int id, status, i;
+
+  for(id = wait(&status), i = 0; i < 6; i++)
+  {
+    if(tab->connexions[i].pidCaddie == id)
+    {
+      tab->connexions[i].pidCaddie = 0;
+      break;
+    }
+  }
 }

@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -14,6 +15,8 @@
 #include <mysql.h>
 #include "protocole.h" // contient la cle et la structure d'un message
 
+
+#include <errno.h>
 int idQ;
 
 ARTICLE articles[10];
@@ -44,6 +47,7 @@ int main(int argc,char* argv[])
     exit(1);
   }
 
+
   // Connexion à la base de donnée
   connexion = mysql_init(NULL);
   if (mysql_real_connect(connexion,"localhost","Student","PassStudent1_","PourStudent",0,0,0) == NULL)
@@ -62,15 +66,19 @@ int main(int argc,char* argv[])
   MYSQL_ROW  Tuple;
 
   // Récupération descripteur écriture du pipe
-  fdWpipe = atoi(argv[1]);
+  //fdWpipe = atoi(argv[1]);
 
   while(1)
   {
+    printf("SUCCEESSSSSSSSSSS\n");
     if (msgrcv(idQ,&m,sizeof(MESSAGE)-sizeof(long),getpid(),0) == -1)
     {
+      char* tm = strerror(errno);
+      printf("JOLI PETIT MESSAGE : %s\n", tm);
       perror("(CADDIE) Erreur de msgrcv");
       exit(1);
     }
+    
 
     switch(m.requete)
     {
@@ -80,10 +88,51 @@ int main(int argc,char* argv[])
 
       case LOGOUT :   // TO DO
                       fprintf(stderr,"(CADDIE %d) Requete LOGOUT reçue de %d\n",getpid(),m.expediteur);
+                      
+                      mysql_close(connexion); // ou mysql_shutdown ?
+                      exit(0);                     
                       break;
 
       case CONSULT :  // TO DO
                       fprintf(stderr,"(CADDIE %d) Requete CONSULT reçue de %d\n",getpid(),m.expediteur);
+                      
+                      sprintf(requete, "select * from UNIX_FINAL where id = %d;", m.data1);
+                      if(mysql_query(connexion, requete) != 0)
+                      {
+                        fprintf(stderr, "Erreur de mysql_query %s\n", mysql_error(connexion));
+                      }
+                      else
+                      {
+                        if((resultat = mysql_store_result(connexion)) == NULL)
+                          fprintf(stderr, "Erreur de mysql_store_result %s\n", mysql_error(connexion));
+                        else
+                        {
+                          Tuple = mysql_fetch_row(resultat);
+                          reponse.requete = CONSULT;
+                          reponse.type = m.expediteur;
+
+                          reponse.data1 = atoi(Tuple[0]);
+                          strcpy(reponse.data2, Tuple[1]);
+                          strcpy(reponse.data3, Tuple[3]);
+                          strcpy(reponse.data4, Tuple[4]);
+                          reponse.data5 = atof(Tuple[2]);
+
+                          if(msgsnd(idQ, &reponse, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                            perror("Erreur de snd Caddie");
+                          else
+                            kill(m.expediteur, SIGUSR1);
+
+                          
+                          /*for(size_t i = 0; i < strlen(reponse.data3); i++)
+                          {
+                            if(reponse.data3[i] == '.')
+                            {
+                              reponse.data3[i] = ',';
+                              break;
+                            }
+                          }*/
+                        }
+                      }
                       break;
 
       case ACHAT :    // TO DO

@@ -19,7 +19,7 @@ extern WindowClient *w;
 
 int idQ, idShm;
 bool logged = false, updProblems = true;
-char* pShm;
+char* pShm = NULL;
 ARTICLE articleEnCours;
 float totalCaddie = 0.0;
 
@@ -67,13 +67,16 @@ WindowClient::WindowClient(QWidget *parent) : QMainWindow(parent), ui(new Ui::Wi
 
     // Armement des signaux
     // TO DO
-    struct sigaction s_action1;
+    /*struct sigaction s_action1;
     s_action1.sa_handler = handlerSIGUSR1;
     sigaction(SIGUSR1, &s_action1, nullptr);
 
-    struct sigaction s_action2;
+    /*struct sigaction s_action2;
     s_action2.sa_handler = handlerSIGUSR2;
-    sigaction(SIGUSR2, &s_action2, nullptr);
+    sigaction(SIGUSR2, &s_action2, nullptr);*/
+
+    signal(SIGUSR1, handlerSIGUSR1);
+    signal(SIGUSR2, handlerSIGUSR2); // version précédente n'enregistrait pas le handler -> faisait planter le Client
 
     // Envoi d'une requete de connexion au serveur
     // TO DO
@@ -87,7 +90,6 @@ WindowClient::WindowClient(QWidget *parent) : QMainWindow(parent), ui(new Ui::Wi
       printf("Requete de demande de connexion envoyée !\n");
 
     // Exemples à supprimer
-    setArticle("pommes",5.53,18,"pommes.jpg");
     ajouteArticleTablePanier("cerises",8.96,2);
 }
 
@@ -364,7 +366,6 @@ void WindowClient::on_pushButtonLogin_clicked()
 
     if(msgsnd(idQ, &loginReq, sizeof(MESSAGE) - sizeof(long), 0) == -1)
       perror("Erreur d'envoi de la requête de login...");
-
   }
 }
 
@@ -401,7 +402,17 @@ void WindowClient::on_pushButtonLogout_clicked()
 void WindowClient::on_pushButtonSuivant_clicked()
 {
     // TO DO (étape 3)
-    // Envoi d'une requete CONSULT au serveur
+    MESSAGE nextplz;
+
+    if((nextplz.data1 = articleEnCours.id + 1) < 22)
+    {
+      nextplz.expediteur = getpid();
+      nextplz.type = 1;
+      nextplz.requete = CONSULT;
+
+      if(msgsnd(idQ, &nextplz, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+        perror("Erreur de snd SUIVANT");
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -409,6 +420,17 @@ void WindowClient::on_pushButtonPrecedent_clicked()
 {
     // TO DO (étape 3)
     // Envoi d'une requete CONSULT au serveur
+    MESSAGE nextplz;
+
+    if((nextplz.data1 = articleEnCours.id - 1) != 0)
+    {
+        nextplz.expediteur = getpid();
+        nextplz.type = 1;
+        nextplz.requete = CONSULT;
+
+        if(msgsnd(idQ, &nextplz, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+          perror("Erreur de snd SUIVANT");
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -470,7 +492,7 @@ void WindowClient::on_pushButtonPayer_clicked()
 void handlerSIGUSR1(int sig)
 {
     MESSAGE m;
-    printf("WAZZZZZZZZZZZZUP\n");
+
     if (msgrcv(idQ,&m,sizeof(MESSAGE)-sizeof(long),getpid(),0) != -1)  // !!! a modifier en temps voulu !!!
     {
       
@@ -481,6 +503,17 @@ void handlerSIGUSR1(int sig)
                     {
                       w->loginOK();
                       w->dialogueMessage("LOGIN", m.data4);
+
+                      MESSAGE reqCons;
+
+                      reqCons.type = 1;
+                      reqCons.expediteur = getpid();
+                      reqCons.requete = CONSULT;
+                      reqCons.data1 = 1; // Pour accéder par défaut au 1er article de la DB
+
+                      if(msgsnd(idQ, &reqCons, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                        perror("Erreur de snd");
+
                     }
                     else
                     {
@@ -490,6 +523,14 @@ void handlerSIGUSR1(int sig)
                     break;
 
         case CONSULT : // TO DO (étape 3)
+                    printf("REQUETE CONSULT RECUE\n");
+                    articleEnCours.id = m.data1;
+                    strcpy(articleEnCours.intitule, m.data2);
+                    articleEnCours.prix = m.data5;
+                    articleEnCours.stock = atoi(m.data3);
+                    strcpy(articleEnCours.image, m.data4);
+
+                    w->setArticle(articleEnCours.intitule, articleEnCours.prix, articleEnCours.stock, articleEnCours.image);
                     break;
 
         case ACHAT : // TO DO (étape 5)
@@ -512,11 +553,8 @@ void handlerSIGUSR1(int sig)
 
 void handlerSIGUSR2(int sig)
 {
-  if(!updProblems)
-  {
-    printf("(CLIENT %d) Handler de SIGUSR2...\n", getpid());
-    w->setPublicite(pShm);
-  }
+  printf("(CLIENT %d) Handler de SIGUSR2...\n", getpid());
+  w->setPublicite(pShm);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
