@@ -1,4 +1,5 @@
 #include <csignal>
+#include <cstdlib>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -23,10 +24,11 @@ int dsc;
 
 void afficheTab();
 int checkLogin(MESSAGE *usr);
-void handlerSIGINT(int sig);
-void handlerSIGCHLD(int sig);
 void envoiMessageCaddie(int pidCaddie);
 int findIndex(int pd);
+
+void handlerSIGINT(int sig);
+void handlerSIGCHLD(int sig);
 
 int main()
 {
@@ -38,6 +40,7 @@ int main()
 
   struct sigaction s_action2;
   s_action2.sa_handler = handlerSIGCHLD;
+  s_action2.sa_flags = SA_RESTART | SA_NOCLDSTOP; // Restart interrupted syscalls and ignore stopped children
   sigaction(SIGCHLD, &s_action2, nullptr);
 
   // Creation des ressources
@@ -117,8 +120,7 @@ int main()
       if (msgrcv(idQ,&m,sizeof(MESSAGE)-sizeof(long),1,0) == -1)
       {
         perror("(SERVEUR) Erreur de msgrcv");
-        msgctl(idQ,IPC_RMID,NULL);
-        exit(0);
+        continue;
       }
 
       switch(m.requete)
@@ -182,6 +184,10 @@ int main()
                               }
 
                               tab->connexions[i].pidCaddie = idCad;
+                              
+                              m.type = idCad;
+                              if(msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                                perror("(SERVEUR) Erreur de snd au Caddie");
                             }
                           }
                         }
@@ -206,7 +212,6 @@ int main()
                           {
                             envoiMessageCaddie(tab->connexions[i].pidCaddie);
                             strcpy(tab->connexions[i].nom, "");
-                            tab->connexions[i].pidCaddie = 0;
                           }
                         }
 
@@ -369,24 +374,42 @@ void handlerSIGINT(int sig)
   msgctl(idQ, IPC_RMID, NULL);
   shmctl(idShm, IPC_RMID, NULL);
   
+  MESSAGE byebye;
+  byebye.requete = LOGOUT;
+  
+  write(fdPipe[1], &byebye, sizeof(MESSAGE) -sizeof(long)); // je fais ça car quand on close le pipe, AccesBD reste ON et ne se termine pas malgré la condition 
+
   close(fdPipe[0]);
   close(fdPipe[1]);
 
   exit(0);
 }
 
+#include <errno.h>
 void handlerSIGCHLD(int sig)
 {
-  printf("(SERVEUR) HANDLER DE SIGCHLD...\n");
-  
-  int id, status, i;
+    printf("(SERVEUR) HANDLER DE SIGCHLD...\n");
 
-  for(id = wait(&status), i = 0; i < 6; i++)
-  {
-    if(tab->connexions[i].pidCaddie == id)
+    int id, status;
+
+    while ((id = waitpid(-1, &status, WNOHANG)) > 0)
     {
-      tab->connexions[i].pidCaddie = 0;
-      break;
+        printf("(SERVEUR) Reaped child process with PID %d\n", id);
+
+        for (int i = 0; i < 6; i++)
+        {
+            if (tab->connexions[i].pidCaddie == id)
+            {
+                tab->connexions[i].pidCaddie = 0;
+                break;
+            }
+        }
     }
-  }
+
+    if (id == -1 && errno != ECHILD)
+    {
+        perror("(SERVEUR) Error in waitpid");
+    }
+
+    printf("(SERVEUR) Exiting SIGCHLD handler\n");
 }

@@ -73,7 +73,7 @@ int main(int argc,char* argv[])
 
       case LOGOUT :   // TO DO
                       fprintf(stderr,"(CADDIE %d) Requete LOGOUT reçue de %d\n",getpid(),m.expediteur);
-                      exit(0);                     
+                      exit(0);
                       break;
 
       case CONSULT :  // TO DO
@@ -86,12 +86,15 @@ int main(int argc,char* argv[])
                       else
                       {
                         MESSAGE conf;
-                        printf("BLYAAAAAAAAAAAAAAAAAAAAAAAAAAT\n");
+                        //cv ici
                         if(msgrcv(idQ, &conf, sizeof(MESSAGE) - sizeof(long), getpid(), 0) == -1)
                           perror("(CADDIE) Erreur de rcv CONF");
                         else if(conf.data1 != -1)
                         {
                           MESSAGE repCons;
+                          repCons.type = pidClient;
+                          repCons.expediteur = getpid();
+                          repCons.requete = CONSULT;
                           repCons.data1 = conf.data1;
                           strcpy(repCons.data2, conf.data2);
                           strcpy(repCons.data3, conf.data3);
@@ -101,6 +104,8 @@ int main(int argc,char* argv[])
                           {
                             perror("(CADDIE) Erreur de snd CONF");
                           }
+                          else
+                            kill(pidClient, SIGUSR1);
                         }
                       }
 

@@ -56,12 +56,18 @@ int main(int argc,char* argv[])
   {
     // Lecture d'une requete sur le pipe
     // TO DO
-    if(read(fdRpipe, &m, sizeof(MESSAGE) - sizeof(long)) < 0)
+    int ret = read(fdRpipe, &m, sizeof(MESSAGE) - sizeof(long));
+    
+    if(ret < 0)
     {
       perror("(ACCESBD) Erreur de read");
+      mysql_close(connexion);
       exit(1);
     }
- 
+    else if(ret == 0)
+    {
+      printf("(ACCESBD) no one on the pipe...\n");
+    }
 
     switch(m.requete)
     {
@@ -96,7 +102,6 @@ int main(int argc,char* argv[])
                           reponse.data5 = atof(Tuple[2]);
                         }
                         // Envoi de la reponse au bon caddie
-                        
                         if(msgsnd(idQ, &reponse, sizeof(MESSAGE) - sizeof(long), 0) == -1)
                           perror("Erreur de snd Caddie");
                       }
@@ -116,6 +121,13 @@ int main(int argc,char* argv[])
 
                       // Mise à jour du stock en BD
                       break;
+
+      case LOGOUT :   //En plus pour dire au process qu'il doit mourir
+                      fprintf(stderr,"(ACCESBD %d) Requete LOGOUT reçue de %d\n",getpid(),m.expediteur);
+                      mysql_close(connexion);
+                      exit(0);
+                      break;
+
 
     }
   }
