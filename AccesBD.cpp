@@ -111,7 +111,56 @@ int main(int argc,char* argv[])
       case ACHAT :    // TO DO
                       fprintf(stderr,"(ACCESBD %d) Requete ACHAT reçue de %d\n",getpid(),m.expediteur);
                       // Acces BD
+                      sprintf(requete, "select * from UNIX_FINAL where id = %d;", m.data1);
 
+                      if(mysql_query(connexion, requete) != 0)
+                      {
+                        fprintf(stderr, "Erreur de mysql_query %s\n", mysql_error(connexion));
+                      }
+                      else
+                      {
+                        if((resultat = mysql_store_result(connexion)) == NULL)
+                        {
+                          fprintf(stderr, "Erreur de mysql_store_result %s\n", mysql_error(connexion));
+                          reponse.data1 = -1;
+                        }
+                        else
+                        {
+                          // Preparation de la reponse
+                          Tuple = mysql_fetch_row(resultat);
+                          int newStock = atoi(Tuple[3]) - atoi(m.data2);
+
+                          if(newStock < 0)
+                          {
+                            strcpy(reponse.data3, "0");
+                          }
+                          else
+                          {
+                            sprintf(requete, "update UNIX_FINAL set stock=%d where id=%d;", newStock, m.data1);
+                            
+                            if(mysql_query(connexion, requete) != 0)
+                            {
+                              fprintf(stderr, "Erreur de mysql_query %s\n", mysql_error(connexion));
+                            }
+                            else
+                            {
+                              strcpy(reponse.data3, m.data2);
+                            }
+                          }
+                          reponse.requete = ACHAT;
+                          reponse.type = m.expediteur;
+                          reponse.expediteur = getpid();
+
+                          reponse.data1 = atoi(Tuple[0]);
+                          strcpy(reponse.data2, Tuple[1]);
+                          strcpy(reponse.data4, Tuple[4]);
+                          reponse.data5 = atof(Tuple[2]);
+
+                          if(msgsnd(idQ, &reponse, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                            perror("(ACCESBD) Erreur de snd ACHAT");
+
+                        }
+                      }
                       // Finalisation et envoi de la reponse
                       break;
 

@@ -5,7 +5,7 @@
 using namespace std;
 
 #include "protocole.h"
-
+#include <stdio.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/ipc.h>
@@ -71,12 +71,12 @@ WindowClient::WindowClient(QWidget *parent) : QMainWindow(parent), ui(new Ui::Wi
     s_action1.sa_handler = handlerSIGUSR1;
     sigaction(SIGUSR1, &s_action1, nullptr);
 
-    /*struct sigaction s_action2;
+    struct sigaction s_action2;
     s_action2.sa_handler = handlerSIGUSR2;
     sigaction(SIGUSR2, &s_action2, nullptr);*/
 
     signal(SIGUSR1, handlerSIGUSR1);
-    signal(SIGUSR2, handlerSIGUSR2); // version précédente n'enregistrait pas le handler -> faisait planter le Client
+    signal(SIGUSR2, handlerSIGUSR2);
 
     // Envoi d'une requete de connexion au serveur
     // TO DO
@@ -89,8 +89,6 @@ WindowClient::WindowClient(QWidget *parent) : QMainWindow(parent), ui(new Ui::Wi
     else
       printf("Requete de demande de connexion envoyée !\n");
 
-    // Exemples à supprimer
-    ajouteArticleTablePanier("cerises",8.96,2);
 }
 
 WindowClient::~WindowClient()
@@ -420,15 +418,15 @@ void WindowClient::on_pushButtonPrecedent_clicked()
 {
     // TO DO (étape 3)
     // Envoi d'une requete CONSULT au serveur
-    MESSAGE nextplz;
+    MESSAGE precedplz;
 
-    if((nextplz.data1 = articleEnCours.id - 1) != 0)
+    if((precedplz.data1 = articleEnCours.id - 1) != 0)
     {
-        nextplz.expediteur = getpid();
-        nextplz.type = 1;
-        nextplz.requete = CONSULT;
+        precedplz.expediteur = getpid();
+        precedplz.type = 1;
+        precedplz.requete = CONSULT;
 
-        if(msgsnd(idQ, &nextplz, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+        if(msgsnd(idQ, &precedplz, sizeof(MESSAGE) - sizeof(long), 0) == -1)
           perror("Erreur de snd SUIVANT");
     }
 }
@@ -438,6 +436,18 @@ void WindowClient::on_pushButtonAcheter_clicked()
 {
     // TO DO (étape 5)
     // Envoi d'une requete ACHAT au serveur
+    MESSAGE achat;
+
+    achat.expediteur = getpid();
+    achat.requete = ACHAT;
+    achat.type = 1;
+
+    achat.data1 = articleEnCours.id;
+    snprintf(achat.data2, 3, "%d", getQuantite());
+
+    if(msgsnd(idQ, &achat, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+      perror("Erreur de snd ACHAT");
+
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -492,8 +502,8 @@ void WindowClient::on_pushButtonPayer_clicked()
 void handlerSIGUSR1(int sig)
 {
     MESSAGE m;
-
-    if (msgrcv(idQ,&m,sizeof(MESSAGE)-sizeof(long),getpid(),0) != -1)  // !!! a modifier en temps voulu !!!
+    printf("BLYYYYYYYAAAAAAAAAAAAAAT\n");
+    while(msgrcv(idQ,&m,sizeof(MESSAGE)-sizeof(long),getpid(),IPC_NOWAIT) != -1)  // !!! a modifier en temps voulu !!!
     {
       
       switch(m.requete)
@@ -534,9 +544,32 @@ void handlerSIGUSR1(int sig)
                     break;
 
         case ACHAT : // TO DO (étape 5)
+                    printf("REQUETE ACHAT RECUE\n");
+
+                    char msg[256];
+                    sprintf(msg, "%s unite(s) de %s achetees avec succes", m.data3, m.data2);
+
+                    w->dialogueMessage("ACHAT", msg);
+                    //update l'article actuel pour meilleure interaction et l'afficher
+                    MESSAGE reqCad;
+                    reqCad.expediteur = getpid();
+                    reqCad.type = 1;
+                    reqCad.requete = CADDIE;
+
+                    if(msgsnd(idQ, &reqCad, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                      perror("Erreur de snd Cad");
+
+                    w->videTablePanier();
+                    totalCaddie = 0;
+
                     break;
 
          case CADDIE : // TO DO (étape 5)
+                    printf("REQUETE CADDIE RECUE\n");
+                    printf("%s\n", m.data2);
+                    w->ajouteArticleTablePanier(m.data2, m.data5, atoi(m.data3));
+                    totalCaddie += m.data5;
+                    w->setTotal(totalCaddie);
                     break;
 
          case TIME_OUT : // TO DO (étape 6)

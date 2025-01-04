@@ -242,10 +242,22 @@ int main()
 
         case ACHAT :    // TO DO
                         fprintf(stderr,"(SERVEUR %d) Requete ACHAT reçue de %d\n",getpid(),m.expediteur);
+                        
+                        m.type = tab->connexions[findIndex(m.expediteur)].pidCaddie;
+
+                        if(msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                          perror("(SERVEUR) Erreur de snd ACHAT");
+
                         break;
 
         case CADDIE :   // TO DO
                         fprintf(stderr,"(SERVEUR %d) Requete CADDIE reçue de %d\n",getpid(),m.expediteur);
+                        
+                        m.type = tab->connexions[findIndex(m.expediteur)].pidCaddie;
+                        
+                        if(msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                          perror("(SERVEUR) Erreur de snd ACHAT");
+                        
                         break;
 
         case CANCEL :   // TO DO

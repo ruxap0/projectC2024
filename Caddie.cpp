@@ -115,6 +115,32 @@ int main(int argc,char* argv[])
                       fprintf(stderr,"(CADDIE %d) Requete ACHAT reçue de %d\n",getpid(),m.expediteur);
 
                       // on transfert la requete à AccesBD
+                      m.expediteur = getpid();
+                      if(write(fdWpipe, &m, sizeof(MESSAGE) - sizeof(long)) != (sizeof(MESSAGE) - sizeof(long)))
+                        perror("(CADDIE) Erreur de Write");
+                      else
+                      {
+                        MESSAGE conf;
+                        if(msgrcv(idQ, &conf, sizeof(MESSAGE) - sizeof(long), getpid(), 0) == -1)
+                          perror("(CADDIE) Erreur de rcv ACHAT");
+                        else
+                        {
+                          if(strcmp(conf.data3, "0") != 0)
+                          {
+                            strcpy(articles[nbArticles].intitule, conf.data2);
+                            articles[nbArticles].prix = conf.data5;
+                            articles[nbArticles].stock = atoi(conf.data3);
+                            nbArticles++;
+                          }
+
+                          conf.type = pidClient;
+                          conf.expediteur = getpid();
+                          if(msgsnd(idQ, &conf, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                            perror("(CADDIE) Erreur de snd");
+                          else
+                           kill(pidClient, SIGUSR1);
+                        }
+                      }
                       
                       // on attend la réponse venant de AccesBD
                         
@@ -124,6 +150,23 @@ int main(int argc,char* argv[])
 
       case CADDIE :   // TO DO
                       fprintf(stderr,"(CADDIE %d) Requete CADDIE reçue de %d\n",getpid(),m.expediteur);
+                      
+                      for(int i = 0; i < nbArticles; i++)
+                      {
+                        MESSAGE msgArt;
+                        msgArt.requete = CADDIE;
+                        msgArt.expediteur = getpid();
+                        msgArt.type = pidClient;
+                        strcpy(msgArt.data2, articles[i].intitule);
+                        sprintf(msgArt.data3, "%d", articles[i].stock);
+                        msgArt.data5 = articles[i].prix;
+                        
+                        if(msgsnd(idQ, &msgArt, sizeof(MESSAGE) - sizeof(long), IPC_NOWAIT) == -1)
+                          perror("(CADDIE) Erreur de snd CADDIE");
+                        else
+                          kill(pidClient, SIGUSR1);
+                      }
+                      
                       break;
 
       case CANCEL :   // TO DO
