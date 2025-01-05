@@ -26,6 +26,8 @@ float totalCaddie = 0.0;
 void handlerSIGUSR1(int sig);
 void handlerSIGUSR2(int sig);
 
+void setupMessage(MESSAGE *m, int dest, int exp, int req);
+
 #define REPERTOIRE_IMAGES "images/"
 
 WindowClient::WindowClient(QWidget *parent) : QMainWindow(parent), ui(new Ui::WindowClient)
@@ -81,9 +83,9 @@ WindowClient::WindowClient(QWidget *parent) : QMainWindow(parent), ui(new Ui::Wi
     // Envoi d'une requete de connexion au serveur
     // TO DO
     MESSAGE connectRequest;
-    connectRequest.expediteur = getpid();
-    connectRequest.type = 1;
-    connectRequest.requete = CONNECT;
+
+    setupMessage(&connectRequest, 1, getpid(), CONNECT);
+
     if(msgsnd(idQ, &connectRequest, sizeof(MESSAGE) - sizeof(long), 0))
       perror("Erreur de l'envoi de la demande de connection...\n");
     else
@@ -331,9 +333,7 @@ void WindowClient::closeEvent(QCloseEvent *event)
     w->on_pushButtonLogout_clicked();
 
   // Envoi d'une requete de deconnexion au serveur
-  deconnect.type = 1;
-  deconnect.expediteur = getpid();
-  deconnect.requete = DECONNECT;
+  setupMessage(&deconnect, 1, getpid(), DECONNECT);
 
   if(msgsnd(idQ, &deconnect, sizeof(MESSAGE) - sizeof(long), 0) == -1)
     perror("Erreur d'envoi de message de deconnexion...");
@@ -352,9 +352,8 @@ void WindowClient::on_pushButtonLogin_clicked()
     printf("Nom ou Mot de passe trop court... (min 3 caractères)\n");
   else
   {
-    loginReq.expediteur = getpid();
-    loginReq.type = 1;
-    loginReq.requete = LOGIN;
+    setupMessage(&loginReq, 1, getpid(), LOGIN);
+
     if(isNouveauClientChecked())
       loginReq.data1 = 1;
     else
@@ -371,11 +370,9 @@ void WindowClient::on_pushButtonLogin_clicked()
 void WindowClient::on_pushButtonLogout_clicked()
 {
   MESSAGE req;
-    // Envoi d'une requete CANCEL_ALL au serveur (au cas où le panier n'est pas vide)
-    // TO DO
-  req.expediteur = getpid();
-  req.type = 1;
-  req.requete = CANCEL_ALL;
+  // Envoi d'une requete CANCEL_ALL au serveur (au cas où le panier n'est pas vide)
+  // TO DO
+  setupMessage(&req, 1, getpid(), CANCEL_ALL);
 
   if(msgsnd(idQ, &req, sizeof(MESSAGE) - sizeof(long), 0) == -1)
     perror("Erreur d'envoi de cancel_all...\n");
@@ -384,9 +381,7 @@ void WindowClient::on_pushButtonLogout_clicked()
   // TO DO
   MESSAGE logoutReq;
 
-  logoutReq.expediteur = getpid();
-  logoutReq.type = 1;
-  logoutReq.requete = LOGOUT;
+  setupMessage(&logoutReq, 1, getpid(), LOGOUT);
 
   if(msgsnd(idQ, &logoutReq, sizeof(MESSAGE) - sizeof(long), 0) == -1)
     perror("Erreur de l'envoi de logout...");
@@ -404,6 +399,7 @@ void WindowClient::on_pushButtonSuivant_clicked()
 
     if((nextplz.data1 = articleEnCours.id + 1) < 22)
     {
+      setupMessage(&nextplz, 1, getpid(), CONSULT);
       nextplz.expediteur = getpid();
       nextplz.type = 1;
       nextplz.requete = CONSULT;
@@ -422,12 +418,10 @@ void WindowClient::on_pushButtonPrecedent_clicked()
 
     if((precedplz.data1 = articleEnCours.id - 1) != 0)
     {
-        precedplz.expediteur = getpid();
-        precedplz.type = 1;
-        precedplz.requete = CONSULT;
+      setupMessage(&precedplz, 1, getpid(), CONSULT);
 
-        if(msgsnd(idQ, &precedplz, sizeof(MESSAGE) - sizeof(long), 0) == -1)
-          perror("Erreur de snd SUIVANT");
+      if(msgsnd(idQ, &precedplz, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+        perror("Erreur de snd SUIVANT");
     }
 }
 
@@ -438,10 +432,7 @@ void WindowClient::on_pushButtonAcheter_clicked()
     // Envoi d'une requete ACHAT au serveur
     MESSAGE achat;
 
-    achat.expediteur = getpid();
-    achat.requete = ACHAT;
-    achat.type = 1;
-
+    setupMessage(&achat, 1, getpid(), ACHAT);
     achat.data1 = articleEnCours.id;
     sprintf(achat.data2, "%d", getQuantite());
 
@@ -461,9 +452,8 @@ void WindowClient::on_pushButtonSupprimer_clicked()
     {
       // Envoi d'une requete CANCEL au serveur
       MESSAGE cncl;
-      cncl.requete = CANCEL;
-      cncl.type = 1;
-      cncl.expediteur = getpid();
+
+      setupMessage(&cncl, 1, getpid(), CANCEL);
       cncl.data1 = ind;
 
       if(msgsnd(idQ, &cncl, sizeof(MESSAGE) - sizeof(long), 0) == -1)
@@ -479,6 +469,8 @@ void WindowClient::on_pushButtonSupprimer_clicked()
       
       if(msgsnd(idQ, &cncl, sizeof(MESSAGE) - sizeof(long), 0) == -1)
         perror("Erreur de snd Caddie");
+
+      w->dialogueMessage("SUPPRESSION", "Vous avez supprimé un type d'article du panier");
     }
 }
 
@@ -489,9 +481,7 @@ void WindowClient::on_pushButtonViderPanier_clicked()
     // Envoi d'une requete CANCEL_ALL au serveur
     MESSAGE cnall;
 
-    cnall.expediteur = getpid();
-    cnall.type = 1;
-    cnall.requete = CANCEL_ALL;
+    setupMessage(&cnall, 1, getpid(), CANCEL_ALL);
 
     if(msgsnd(idQ, &cnall, sizeof(MESSAGE) - sizeof(long), 0) == -1)
       perror("Erreur de snd CANCEL_ALL");
@@ -546,9 +536,7 @@ void handlerSIGUSR1(int sig)
 
                       MESSAGE reqCons;
 
-                      reqCons.type = 1;
-                      reqCons.expediteur = getpid();
-                      reqCons.requete = CONSULT;
+                      setupMessage(&reqCons, 1, getpid(), CONSULT);
                       reqCons.data1 = 1; // Pour accéder par défaut au 1er article de la DB
 
                       if(msgsnd(idQ, &reqCons, sizeof(MESSAGE) - sizeof(long), 0) == -1)
@@ -582,9 +570,8 @@ void handlerSIGUSR1(int sig)
                     w->dialogueMessage("ACHAT", msg);
                     //update l'article actuel pour meilleure interaction et l'afficher
                     MESSAGE reqCad;
-                    reqCad.expediteur = getpid();
-                    reqCad.type = 1;
-                    reqCad.requete = CADDIE;
+
+                    setupMessage(&reqCad, 1, getpid(), CADDIE);
 
                     if(msgsnd(idQ, &reqCad, sizeof(MESSAGE) - sizeof(long), 0) == -1)
                       perror("Erreur de snd Cad");
@@ -623,3 +610,10 @@ void handlerSIGUSR2(int sig)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void setupMessage(MESSAGE *m, int dest, int exp, int req)
+{
+  m->expediteur = exp;
+  m->type = dest;
+  m->requete = req;
+}

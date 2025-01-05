@@ -63,7 +63,7 @@ int main(int argc,char* argv[])
 
   while(1)
   {
-    alarm(5);
+    alarm(60);
     
     if(msgrcv(idQ,&m,sizeof(MESSAGE) - sizeof(long),getpid(),0) == -1)
     {
@@ -199,20 +199,24 @@ int main(int argc,char* argv[])
       }   
 
       case CANCEL :   // TO DO
+      {
                       fprintf(stderr,"(CADDIE %d) Requete CANCEL reçue de %d\n",getpid(),m.expediteur);
 
                       // on transmet la requete à AccesBD
                       m.expediteur = getpid();
-                      sprintf(m.data2, "%d", articles[m.data1].stock);
+                      int i = m.data1;
+                      m.data1 = articles[i].id;
+                      sprintf(m.data2, "%d", articles[i].stock);
 
                       if(write(fdWpipe, &m, sizeof(MESSAGE) - sizeof(long)) != (sizeof(MESSAGE) - sizeof(long)))
                         perror("(CADDIE) Erreur de write");
 
                       // Suppression de l'aricle du panier
-                      articles[m.data1].id = -1;
+                      articles[i].id = -1;
                       nbArticles--;
 
                       break;
+      }
 
       case CANCEL_ALL : // TO DO
       {
