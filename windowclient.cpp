@@ -443,11 +443,10 @@ void WindowClient::on_pushButtonAcheter_clicked()
     achat.type = 1;
 
     achat.data1 = articleEnCours.id;
-    snprintf(achat.data2, 3, "%d", getQuantite());
+    sprintf(achat.data2, "%d", getQuantite());
 
     if(msgsnd(idQ, &achat, sizeof(MESSAGE) - sizeof(long), 0) == -1)
       perror("Erreur de snd ACHAT");
-
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -604,6 +603,8 @@ void handlerSIGUSR1(int sig)
                     break;
 
          case TIME_OUT : // TO DO (étape 6)
+                    w->dialogueErreur("TIME OUT", "Vous êtes resté inactif trop longtemps... Logout en cours");
+                    w->logoutOK();
                     break;
 
          case BUSY : // TO DO (étape 7)

@@ -283,6 +283,12 @@ int main()
 
         case PAYER : // TO DO
                         fprintf(stderr,"(SERVEUR %d) Requete PAYER reçue de %d\n",getpid(),m.expediteur);
+                        
+                        m.type = tab->connexions[findIndex(m.expediteur)].pidCaddie;
+
+                        if(msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                          perror("(SERVEUR) Erreur de snd CANCEL");
+                        
                         break;
 
         case NEW_PUB :  // TO DO

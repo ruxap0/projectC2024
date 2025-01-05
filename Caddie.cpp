@@ -1,3 +1,4 @@
+#include <csignal>
 #include <cstddef>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,17 +28,18 @@ int fdWpipe;
 int pidClient;
 
 void handlerSIGALRM(int sig);
+void cancelall();
 
 int main(int argc,char* argv[])
 {
   // Masquage de SIGINT
-  sigset_t mask;
+  /*sigset_t mask;
   sigaddset(&mask,SIGINT);
-  sigprocmask(SIG_SETMASK,&mask,NULL);
+  sigprocmask(SIG_SETMASK,&mask,NULL);*/
 
   // Armement des signaux
   // TO DO
-
+  signal(SIGALRM, handlerSIGALRM);
 
   // Boucle init id Article -1
   for(int i = 0; i < 10; i++) 
@@ -61,7 +63,9 @@ int main(int argc,char* argv[])
 
   while(1)
   {
-    if (msgrcv(idQ,&m,sizeof(MESSAGE) - sizeof(long),getpid(),0) == -1)
+    alarm(5);
+    
+    if(msgrcv(idQ,&m,sizeof(MESSAGE) - sizeof(long),getpid(),0) == -1)
     {
       char* tm = strerror(errno);
       printf("JOLI PETIT MESSAGE : %s\n", tm);
@@ -69,6 +73,7 @@ int main(int argc,char* argv[])
       exit(1);
     }
     
+    alarm(0);
 
     switch(m.requete)
     {
@@ -146,6 +151,8 @@ int main(int argc,char* argv[])
                               }
                             }                            
                           }
+
+                          printf("BLYYYYYYYAAAAAAAAAAAAAAT\n");
                           
                           conf.type = pidClient;
                           conf.expediteur = getpid();
@@ -181,7 +188,6 @@ int main(int argc,char* argv[])
                           sprintf(msgArt.data3, "%d", articles[i].stock);
                           msgArt.data5 = articles[i].prix;
                           
-                          printf("BLYYYYYYYAAAAAAAAAAAAAAT\n");
                           if(msgsnd(idQ, &msgArt, sizeof(MESSAGE) - sizeof(long), IPC_NOWAIT) == -1)
                             perror("(CADDIE) Erreur de snd CADDIE");
                           else
@@ -209,36 +215,22 @@ int main(int argc,char* argv[])
                       break;
 
       case CANCEL_ALL : // TO DO
-      { // int i = 0 crée pb quand pas de {}
-                       fprintf(stderr,"(CADDIE %d) Requete CANCEL_ALL reçue de %d\n",getpid(),m.expediteur);
+      {
+                      fprintf(stderr,"(CADDIE %d) Requete CANCEL_ALL reçue de %d\n",getpid(),m.expediteur);
 
-                      // On envoie a AccesBD autant de requetes CANCEL qu'il y a d'articles dans le panier
-                      int i = 0;
+                      cancelall();
 
-                      while(nbArticles > 0 && i < 10) // i pas trop utile mais au cas où on sait jamais
-                      {
-                        if(articles[i].id != -1)
-                        {
-                          m.expediteur = getpid();
-                          m.requete = CANCEL;
-                          m.data1 = articles[i].id,
-                          sprintf(m.data2, "%d", articles[i].stock);
-                          
-                          if(write(fdWpipe, &m, sizeof(MESSAGE) - sizeof(long)) != (sizeof(MESSAGE) - sizeof(long)))
-                            perror("(CADDIE) Erreur de write");
-                          
-                          articles[i].id = -1;
-                          nbArticles--;
-                        }
-                        i++;
-                      }
-                      // On vide le panier
                       break;
       }
       case PAYER :    // TO DO
                       fprintf(stderr,"(CADDIE %d) Requete PAYER reçue de %d\n",getpid(),m.expediteur);
 
                       // On vide le panier
+                      for(int i = 0; i < 10; i++)
+                        articles[i].id = -1;
+
+                      nbArticles = 0;
+                      
                       break;
     }
   }
@@ -250,8 +242,47 @@ void handlerSIGALRM(int sig)
 
   // Annulation du caddie et mise à jour de la BD
   // On envoie a AccesBD autant de requetes CANCEL qu'il y a d'articles dans le panier
-
+  cancelall();
   // Envoi d'un Time Out au client (s'il existe toujours)
+
+  MESSAGE tmout;
+  tmout.type = pidClient;
+  tmout.requete = TIME_OUT;
+  tmout.expediteur = getpid();
+
+  if(msgsnd(idQ, &tmout, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+    perror("(CADDIE) Erreur de snd TIMEOUT");
+  else
+    kill(pidClient, SIGUSR1);
          
   exit(0);
+}
+
+///////////////////////////////////////////////////////////////
+////// Fonctions supp     /////////////////////////////////////
+///////////////////////////////////////////////////////////////
+
+void cancelall()
+{
+  MESSAGE m;
+  // On envoie a AccesBD autant de requetes CANCEL qu'il y a d'articles dans le panier
+  int i = 0;
+
+  while(nbArticles > 0 && i < 10) // i pas trop utile mais au cas où on sait jamais
+  {
+    if(articles[i].id != -1)
+    {
+      m.expediteur = getpid();
+      m.requete = CANCEL;
+      m.data1 = articles[i].id,
+      sprintf(m.data2, "%d", articles[i].stock);
+                          
+      if(write(fdWpipe, &m, sizeof(MESSAGE) - sizeof(long)) != (sizeof(MESSAGE) - sizeof(long)))
+        perror("(CADDIE) Erreur de write");
+                          
+      articles[i].id = -1;
+      nbArticles--;
+    }
+    i++;
+  }
 }
