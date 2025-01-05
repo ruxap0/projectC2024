@@ -26,6 +26,7 @@ void afficheTab();
 int checkLogin(MESSAGE *usr);
 void envoiMessageCaddie(int pidCaddie);
 int findIndex(int pd);
+void redirectCaddie(MESSAGE *m);
 
 void handlerSIGINT(int sig);
 void handlerSIGCHLD(int sig);
@@ -244,41 +245,29 @@ int main()
         case ACHAT :    // TO DO
                         fprintf(stderr,"(SERVEUR %d) Requete ACHAT reçue de %d\n",getpid(),m.expediteur);
                         
-                        m.type = tab->connexions[findIndex(m.expediteur)].pidCaddie;
-
-                        if(msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
-                          perror("(SERVEUR) Erreur de snd ACHAT");
+                        redirectCaddie(&m);
 
                         break;
 
         case CADDIE :   // TO DO
                         fprintf(stderr,"(SERVEUR %d) Requete CADDIE reçue de %d\n",getpid(),m.expediteur);
                         
-                        m.type = tab->connexions[findIndex(m.expediteur)].pidCaddie;
-                        
-                        if(msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
-                          perror("(SERVEUR) Erreur de snd ACHAT");
+                        redirectCaddie(&m);
                         
                         break;
 
         case CANCEL :   // TO DO
                         fprintf(stderr,"(SERVEUR %d) Requete CANCEL reçue de %d\n",getpid(),m.expediteur);
                         
-                        m.type = tab->connexions[findIndex(m.expediteur)].pidCaddie;
-
-                        if(msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
-                          perror("(SERVEUR) Erreur de snd CANCEL");
+                        redirectCaddie(&m);
 
                         break;
 
         case CANCEL_ALL : // TO DO
                         fprintf(stderr,"(SERVEUR %d) Requete CANCEL_ALL reçue de %d\n",getpid(),m.expediteur);
                         
-                        m.type = tab->connexions[findIndex(m.expediteur)].pidCaddie;
-                        
-                        if(msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
-                          perror("(SERVEUR) Erreur de snd CANCEL");
-                        
+                        redirectCaddie(&m);
+
                         break;
 
         case PAYER : // TO DO
@@ -288,7 +277,7 @@ int main()
 
                         if(msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
                           perror("(SERVEUR) Erreur de snd CANCEL");
-                        
+
                         break;
 
         case NEW_PUB :  // TO DO
@@ -388,6 +377,14 @@ int findIndex(int pd)
   }
 
   return -1;
+}
+
+void redirectCaddie(MESSAGE *m)
+{
+  m->type = tab->connexions[findIndex(m->expediteur)].pidCaddie;
+
+  if(msgsnd(idQ, m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+    perror("(SERVEUR) Erreur de snd CANCEL");
 }
 
 
