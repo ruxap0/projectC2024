@@ -109,6 +109,7 @@ int main()
 
     tab->pidServeur = getpid();
     tab->pidPublicite = pidPub;
+    tab->pidAccesBD = pidAcces;
 
     MESSAGE m;
     MESSAGE reponse;
@@ -262,10 +263,22 @@ int main()
 
         case CANCEL :   // TO DO
                         fprintf(stderr,"(SERVEUR %d) Requete CANCEL reçue de %d\n",getpid(),m.expediteur);
+                        
+                        m.type = tab->connexions[findIndex(m.expediteur)].pidCaddie;
+
+                        if(msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                          perror("(SERVEUR) Erreur de snd CANCEL");
+
                         break;
 
         case CANCEL_ALL : // TO DO
                         fprintf(stderr,"(SERVEUR %d) Requete CANCEL_ALL reçue de %d\n",getpid(),m.expediteur);
+                        
+                        m.type = tab->connexions[findIndex(m.expediteur)].pidCaddie;
+                        
+                        if(msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                          perror("(SERVEUR) Erreur de snd CANCEL");
+                        
                         break;
 
         case PAYER : // TO DO

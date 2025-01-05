@@ -20,6 +20,7 @@
 int idQ;
 
 ARTICLE articles[10];
+
 int nbArticles = 0;
 
 int fdWpipe;
@@ -36,6 +37,11 @@ int main(int argc,char* argv[])
 
   // Armement des signaux
   // TO DO
+
+
+  // Boucle init id Article -1
+  for(int i = 0; i < 10; i++) 
+    articles[i].id = -1;
 
   // Recuperation de l'identifiant de la file de messages
   fprintf(stderr,"(CADDIE %d) Recuperation de l'id de la file de messages\n",getpid());
@@ -127,12 +133,20 @@ int main(int argc,char* argv[])
                         {
                           if(strcmp(conf.data3, "0") != 0)
                           {
-                            strcpy(articles[nbArticles].intitule, conf.data2);
-                            articles[nbArticles].prix = conf.data5;
-                            articles[nbArticles].stock = atoi(conf.data3);
-                            nbArticles++;
+                            for(int i = 0; i < 10; i++)
+                            {
+                              if(articles[i].id == -1)
+                              {
+                                articles[i].id = m.data1;
+                                strcpy(articles[i].intitule, conf.data2);
+                                articles[i].prix = conf.data5;
+                                articles[i].stock = atoi(conf.data3);
+                                nbArticles++;
+                                break;
+                              }
+                            }                            
                           }
-
+                          
                           conf.type = pidClient;
                           conf.expediteur = getpid();
                           if(msgsnd(idQ, &conf, sizeof(MESSAGE) - sizeof(long), 0) == -1)
@@ -148,43 +162,79 @@ int main(int argc,char* argv[])
 
                       break;
 
-      case CADDIE :   // TO DO
+      case CADDIE :
+      {
+                      // TO DO
                       fprintf(stderr,"(CADDIE %d) Requete CADDIE reçue de %d\n",getpid(),m.expediteur);
                       
-                      for(int i = 0; i < nbArticles; i++)
+                      for(int i = 0; i < 10; i++)
                       {
-                        MESSAGE msgArt;
-                        msgArt.requete = CADDIE;
-                        msgArt.expediteur = getpid();
-                        msgArt.type = pidClient;
-                        strcpy(msgArt.data2, articles[i].intitule);
-                        sprintf(msgArt.data3, "%d", articles[i].stock);
-                        msgArt.data5 = articles[i].prix;
-                        
-                        if(msgsnd(idQ, &msgArt, sizeof(MESSAGE) - sizeof(long), IPC_NOWAIT) == -1)
-                          perror("(CADDIE) Erreur de snd CADDIE");
-                        else
-                          kill(pidClient, SIGUSR1);
+                        if(articles[i].id != -1)
+                        {
+                          MESSAGE msgArt;
+                          msgArt.requete = CADDIE;
+                          msgArt.expediteur = getpid();
+                          msgArt.type = pidClient;
+
+                          msgArt.data1 = articles[i].id;
+                          strcpy(msgArt.data2, articles[i].intitule);
+                          sprintf(msgArt.data3, "%d", articles[i].stock);
+                          msgArt.data5 = articles[i].prix;
+                          
+                          printf("BLYYYYYYYAAAAAAAAAAAAAAT\n");
+                          if(msgsnd(idQ, &msgArt, sizeof(MESSAGE) - sizeof(long), IPC_NOWAIT) == -1)
+                            perror("(CADDIE) Erreur de snd CADDIE");
+                          else
+                            kill(pidClient, SIGUSR1);
+                        }
                       }
                       
                       break;
+      }   
 
       case CANCEL :   // TO DO
                       fprintf(stderr,"(CADDIE %d) Requete CANCEL reçue de %d\n",getpid(),m.expediteur);
 
                       // on transmet la requete à AccesBD
+                      m.expediteur = getpid();
+                      sprintf(m.data2, "%d", articles[m.data1].stock);
+
+                      if(write(fdWpipe, &m, sizeof(MESSAGE) - sizeof(long)) != (sizeof(MESSAGE) - sizeof(long)))
+                        perror("(CADDIE) Erreur de write");
 
                       // Suppression de l'aricle du panier
+                      articles[m.data1].id = -1;
+                      nbArticles--;
+
                       break;
 
       case CANCEL_ALL : // TO DO
-                      fprintf(stderr,"(CADDIE %d) Requete CANCEL_ALL reçue de %d\n",getpid(),m.expediteur);
+      { // int i = 0 crée pb quand pas de {}
+                       fprintf(stderr,"(CADDIE %d) Requete CANCEL_ALL reçue de %d\n",getpid(),m.expediteur);
 
-                      // On envoie a AccesBD autant de requeres CANCEL qu'il y a d'articles dans le panier
+                      // On envoie a AccesBD autant de requetes CANCEL qu'il y a d'articles dans le panier
+                      int i = 0;
 
+                      while(nbArticles > 0 && i < 10) // i pas trop utile mais au cas où on sait jamais
+                      {
+                        if(articles[i].id != -1)
+                        {
+                          m.expediteur = getpid();
+                          m.requete = CANCEL;
+                          m.data1 = articles[i].id,
+                          sprintf(m.data2, "%d", articles[i].stock);
+                          
+                          if(write(fdWpipe, &m, sizeof(MESSAGE) - sizeof(long)) != (sizeof(MESSAGE) - sizeof(long)))
+                            perror("(CADDIE) Erreur de write");
+                          
+                          articles[i].id = -1;
+                          nbArticles--;
+                        }
+                        i++;
+                      }
                       // On vide le panier
                       break;
-
+      }
       case PAYER :    // TO DO
                       fprintf(stderr,"(CADDIE %d) Requete PAYER reçue de %d\n",getpid(),m.expediteur);
 

@@ -75,8 +75,8 @@ WindowClient::WindowClient(QWidget *parent) : QMainWindow(parent), ui(new Ui::Wi
     s_action2.sa_handler = handlerSIGUSR2;
     sigaction(SIGUSR2, &s_action2, nullptr);*/
 
-    signal(SIGUSR1, handlerSIGUSR1);
-    signal(SIGUSR2, handlerSIGUSR2);
+    signal(SIGUSR1, handlerSIGUSR1); // utiliser sigaction -> pb 
+    signal(SIGUSR2, handlerSIGUSR2); //Pb lors de l'init des 2 sigusr ?
 
     // Envoi d'une requete de connexion au serveur
     // TO DO
@@ -367,11 +367,10 @@ void WindowClient::on_pushButtonLogin_clicked()
   }
 }
 
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void WindowClient::on_pushButtonLogout_clicked()
 {
-  /*MESSAGE req;
+  MESSAGE req;
     // Envoi d'une requete CANCEL_ALL au serveur (au cas où le panier n'est pas vide)
     // TO DO
   req.expediteur = getpid();
@@ -380,7 +379,6 @@ void WindowClient::on_pushButtonLogout_clicked()
 
   if(msgsnd(idQ, &req, sizeof(MESSAGE) - sizeof(long), 0) == -1)
     perror("Erreur d'envoi de cancel_all...\n");
-  else*/
 
   // Envoi d'une requete de logout au serveur
   // TO DO
@@ -394,6 +392,8 @@ void WindowClient::on_pushButtonLogout_clicked()
     perror("Erreur de l'envoi de logout...");
   else
     logoutOK();
+  
+  logged = false;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -454,14 +454,33 @@ void WindowClient::on_pushButtonAcheter_clicked()
 void WindowClient::on_pushButtonSupprimer_clicked()
 {
     // TO DO (étape 6)
-    // Envoi d'une requete CANCEL au serveur
+    int ind = getIndiceArticleSelectionne();
 
-    // Mise à jour du caddie
-    w->videTablePanier();
-    totalCaddie = 0.0;
-    w->setTotal(-1.0);
+    if(ind == -1)
+      w->dialogueErreur("SUPPRIMER", "Aucun article sélectionné");
+    else
+    {
+      // Envoi d'une requete CANCEL au serveur
+      MESSAGE cncl;
+      cncl.requete = CANCEL;
+      cncl.type = 1;
+      cncl.expediteur = getpid();
+      cncl.data1 = ind;
 
-    // Envoi requete CADDIE au serveur
+      if(msgsnd(idQ, &cncl, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+        perror("Erreur de snd CANCEL");
+
+      // Mise à jour du caddie
+      w->videTablePanier();
+      totalCaddie = 0.0;
+      w->setTotal(-1.0);
+      
+      // Envoi requete CADDIE au serveur
+      cncl.requete = CADDIE;
+      
+      if(msgsnd(idQ, &cncl, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+        perror("Erreur de snd Caddie");
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -469,6 +488,14 @@ void WindowClient::on_pushButtonViderPanier_clicked()
 {
     // TO DO (étape 6)
     // Envoi d'une requete CANCEL_ALL au serveur
+    MESSAGE cnall;
+
+    cnall.expediteur = getpid();
+    cnall.type = 1;
+    cnall.requete = CANCEL_ALL;
+
+    if(msgsnd(idQ, &cnall, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+      perror("Erreur de snd CANCEL_ALL");
 
     // Mise à jour du caddie
     w->videTablePanier();
@@ -476,6 +503,10 @@ void WindowClient::on_pushButtonViderPanier_clicked()
     w->setTotal(-1.0);
 
     // Envoi requete CADDIE au serveur
+    cnall.requete = CADDIE;
+      
+    if(msgsnd(idQ, &cnall, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+      perror("Erreur de snd Caddie");
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -502,7 +533,7 @@ void WindowClient::on_pushButtonPayer_clicked()
 void handlerSIGUSR1(int sig)
 {
     MESSAGE m;
-    printf("BLYYYYYYYAAAAAAAAAAAAAAT\n");
+
     while(msgrcv(idQ,&m,sizeof(MESSAGE)-sizeof(long),getpid(),IPC_NOWAIT) != -1)  // !!! a modifier en temps voulu !!!
     {
       
@@ -566,7 +597,7 @@ void handlerSIGUSR1(int sig)
 
          case CADDIE : // TO DO (étape 5)
                     printf("REQUETE CADDIE RECUE\n");
-                    printf("%s\n", m.data2);
+
                     w->ajouteArticleTablePanier(m.data2, m.data5, atoi(m.data3));
                     totalCaddie += m.data5;
                     w->setTotal(totalCaddie);

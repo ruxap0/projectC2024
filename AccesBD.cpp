@@ -158,7 +158,6 @@ int main(int argc,char* argv[])
 
                           if(msgsnd(idQ, &reponse, sizeof(MESSAGE) - sizeof(long), 0) == -1)
                             perror("(ACCESBD) Erreur de snd ACHAT");
-
                         }
                       }
                       // Finalisation et envoi de la reponse
@@ -166,9 +165,37 @@ int main(int argc,char* argv[])
 
       case CANCEL :   // TO DO
                       fprintf(stderr,"(ACCESBD %d) Requete CANCEL reçue de %d\n",getpid(),m.expediteur);
+                      
                       // Acces BD
+                      sprintf(requete, "select * from UNIX_FINAL where id = %d;", m.data1);
 
-                      // Mise à jour du stock en BD
+                      if(mysql_query(connexion, requete) != 0)
+                      {
+                        fprintf(stderr, "Erreur de mysql_query %s\n", mysql_error(connexion));
+                      }
+                      else
+                      {
+                        if((resultat = mysql_store_result(connexion)) == NULL)
+                        {
+                          fprintf(stderr, "Erreur de mysql_store_result %s\n", mysql_error(connexion));
+                          reponse.data1 = -1;
+                        }
+                        else
+                        {
+                          // Preparation de la reponse
+                          Tuple = mysql_fetch_row(resultat);
+                          int newStock = atoi(Tuple[3]) + atoi(m.data2);
+
+                          // Mise à jour du stock en BD
+                          sprintf(requete, "update UNIX_FINAL set stock=%d where id=%d;", newStock, m.data1);
+
+                          if(mysql_query(connexion, requete) != 0)
+                          {
+                            fprintf(stderr, "Erreur de mysql_query %s\n", mysql_error(connexion));
+                          }
+                        }
+                      }
+                      
                       break;
 
       case LOGOUT :   //En plus pour dire au process qu'il doit mourir
@@ -176,8 +203,6 @@ int main(int argc,char* argv[])
                       mysql_close(connexion);
                       exit(0);
                       break;
-
-
     }
   }
 }
