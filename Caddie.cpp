@@ -205,6 +205,11 @@ int main(int argc,char* argv[])
                       // on transmet la requete à AccesBD
                       m.expediteur = getpid();
                       int i = m.data1;
+
+                      while(articles[i].id == -1) // un peu barbare mais voila quoi XD
+                      {
+                        i++;
+                      }
                       m.data1 = articles[i].id;
                       sprintf(m.data2, "%d", articles[i].stock);
 
