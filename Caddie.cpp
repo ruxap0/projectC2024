@@ -29,6 +29,7 @@ int pidClient;
 
 void handlerSIGALRM(int sig);
 void cancelall();
+void setupMessage(MESSAGE *m, int dest, int exp, int req);
 
 int main(int argc,char* argv[])
 {
@@ -67,8 +68,6 @@ int main(int argc,char* argv[])
     
     if(msgrcv(idQ,&m,sizeof(MESSAGE) - sizeof(long),getpid(),0) == -1)
     {
-      char* tm = strerror(errno);
-      printf("JOLI PETIT MESSAGE : %s\n", tm);
       perror("(CADDIE) Erreur de msgrcv");
       exit(1);
     }
@@ -131,11 +130,13 @@ int main(int argc,char* argv[])
                         perror("(CADDIE) Erreur de Write");
                       else
                       {
+                        // on attend la réponse venant de AccesBD
                         MESSAGE conf;
                         if(msgrcv(idQ, &conf, sizeof(MESSAGE) - sizeof(long), getpid(), 0) == -1)
                           perror("(CADDIE) Erreur de rcv ACHAT");
                         else
                         {
+                          // Envoi de la reponse au client
                           if(strcmp(conf.data3, "0") != 0)
                           {
                             for(int i = 0; i < 10; i++)
@@ -151,9 +152,7 @@ int main(int argc,char* argv[])
                               }
                             }                            
                           }
-
-                          printf("BLYYYYYYYAAAAAAAAAAAAAAT\n");
-                          
+                                       
                           conf.type = pidClient;
                           conf.expediteur = getpid();
                           if(msgsnd(idQ, &conf, sizeof(MESSAGE) - sizeof(long), 0) == -1)
@@ -162,10 +161,6 @@ int main(int argc,char* argv[])
                            kill(pidClient, SIGUSR1);
                         }
                       }
-                      
-                      // on attend la réponse venant de AccesBD
-                        
-                      // Envoi de la reponse au client
 
                       break;
 
@@ -179,9 +174,7 @@ int main(int argc,char* argv[])
                         if(articles[i].id != -1)
                         {
                           MESSAGE msgArt;
-                          msgArt.requete = CADDIE;
-                          msgArt.expediteur = getpid();
-                          msgArt.type = pidClient;
+                          setupMessage(&msgArt, pidClient, getpid(), CADDIE);
 
                           msgArt.data1 = articles[i].id;
                           strcpy(msgArt.data2, articles[i].intitule);
@@ -255,9 +248,7 @@ void handlerSIGALRM(int sig)
   // Envoi d'un Time Out au client (s'il existe toujours)
 
   MESSAGE tmout;
-  tmout.type = pidClient;
-  tmout.requete = TIME_OUT;
-  tmout.expediteur = getpid();
+  setupMessage(&tmout, pidClient, getpid(), TIME_OUT);
 
   if(msgsnd(idQ, &tmout, sizeof(MESSAGE) - sizeof(long), 0) == -1)
     perror("(CADDIE) Erreur de snd TIMEOUT");
@@ -281,9 +272,8 @@ void cancelall()
   {
     if(articles[i].id != -1)
     {
-      m.expediteur = getpid();
-      m.requete = CANCEL;
-      m.data1 = articles[i].id,
+      setupMessage(&m, getpid(),getpid(), CANCEL); // dest = getpid car ce n'est pas un msgsnd qu'on fait & pas besoin à AccesBD de le réécrire 
+      m.data1 = articles[i].id;
       sprintf(m.data2, "%d", articles[i].stock);
                           
       if(write(fdWpipe, &m, sizeof(MESSAGE) - sizeof(long)) != (sizeof(MESSAGE) - sizeof(long)))
@@ -294,4 +284,11 @@ void cancelall()
     }
     i++;
   }
+}
+
+void setupMessage(MESSAGE *m, int dest, int exp, int req)
+{
+  m->requete = req;
+  m->expediteur = exp;
+  m->type = dest;
 }

@@ -349,7 +349,7 @@ void WindowClient::on_pushButtonLogin_clicked()
   MESSAGE loginReq;
 
   if(strlen(getMotDePasse()) < 4 || strlen(getNom()) < 4)
-    printf("Nom ou Mot de passe trop court... (min 3 caractères)\n");
+    dialogueErreur("LOGIN REQUEST", "Nom ou Mot de Passe trop court (min 4 caractères)");
   else
   {
     setupMessage(&loginReq, 1, getpid(), LOGIN);
@@ -400,9 +400,6 @@ void WindowClient::on_pushButtonSuivant_clicked()
     if((nextplz.data1 = articleEnCours.id + 1) < 22)
     {
       setupMessage(&nextplz, 1, getpid(), CONSULT);
-      nextplz.expediteur = getpid();
-      nextplz.type = 1;
-      nextplz.requete = CONSULT;
 
       if(msgsnd(idQ, &nextplz, sizeof(MESSAGE) - sizeof(long), 0) == -1)
         perror("Erreur de snd SUIVANT");
@@ -430,14 +427,22 @@ void WindowClient::on_pushButtonAcheter_clicked()
 {
     // TO DO (étape 5)
     // Envoi d'une requete ACHAT au serveur
-    MESSAGE achat;
 
-    setupMessage(&achat, 1, getpid(), ACHAT);
-    achat.data1 = articleEnCours.id;
-    sprintf(achat.data2, "%d", getQuantite());
+    if(getQuantite() == 0)
+    {
+      dialogueErreur("AJOUT", "Quantité (0) invalide ");
+    }
+    else
+    {
+      MESSAGE achat;
 
-    if(msgsnd(idQ, &achat, sizeof(MESSAGE) - sizeof(long), 0) == -1)
-      perror("Erreur de snd ACHAT");
+      setupMessage(&achat, 1, getpid(), ACHAT);
+      achat.data1 = articleEnCours.id;
+      sprintf(achat.data2, "%d", getQuantite());
+
+      if(msgsnd(idQ, &achat, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+        perror("Erreur de snd ACHAT");
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -503,17 +508,37 @@ void WindowClient::on_pushButtonPayer_clicked()
 {
     // TO DO (étape 7)
     // Envoi d'une requete PAYER au serveur
+    if(totalCaddie == 0.0)
+    {
+      dialogueErreur("PAYER", "Aucun article dans le panier");
+    }
+    else
+    {
+      MESSAGE payer;
 
-    char tmp[100];
-    sprintf(tmp,"Merci pour votre paiement de %.2f ! Votre commande sera livrée tout prochainement.",totalCaddie);
-    dialogueMessage("Payer...",tmp);
+      setupMessage(&payer, 1, getpid(), PAYER);
 
-    // Mise à jour du caddie
-    w->videTablePanier();
-    totalCaddie = 0.0;
-    w->setTotal(-1.0);
+      if(msgsnd(idQ, &payer, sizeof(MESSAGE) - sizeof(long), 0) == 1)
+        perror("Erreur de snd PAYER");
 
-    // Envoi requete CADDIE au serveur
+      char tmp[100];
+      sprintf(tmp,"Merci pour votre paiement de %.2f ! Votre commande sera livrée tout prochainement.",totalCaddie);
+      dialogueMessage("Payer...",tmp);
+
+      // Mise à jour du caddie
+      w->videTablePanier();
+      totalCaddie = 0.0;
+      w->setTotal(-1.0);
+
+      // Envoi requete CADDIE au serveur
+
+      MESSAGE cad;
+
+      setupMessage(&cad, 1, getpid(), CADDIE);
+
+      if(msgsnd(idQ, &cad, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+        perror("Erreur de snd CADDIE - Payer");
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -545,7 +570,7 @@ void handlerSIGUSR1(int sig)
                     }
                     else
                     {
-                      w->dialogueMessage("LOGIN ERROR", m.data4);
+                      w->dialogueErreur("LOGIN ERROR", m.data4);
                     }
       
                     break;

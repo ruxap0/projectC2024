@@ -37,10 +37,7 @@ int estPresent(const char* nom)
   }
 
   if(found == 0)
-  {
-    printf("Sup nigger\n");
     return -1;
-  }
   else
     return position;
 }
